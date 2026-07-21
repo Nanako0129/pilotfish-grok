@@ -8,6 +8,9 @@
 
    ```sh
    python3 -m unittest discover -s tests -v
+   python3 benchmarks/e2e-dispatch/run.py --skip-live
+   # optional live proof (spend):
+   # python3 benchmarks/e2e-dispatch/run.py
    git diff --check
    ```
 

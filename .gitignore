@@ -3,3 +3,6 @@ node_modules/
 __pycache__/
 *.pyc
 .pytest_cache/
+# keep committed results.json; ignore local install-only / scratch
+benchmarks/e2e-dispatch/.cache/
+benchmarks/e2e-dispatch/results.install-only.json

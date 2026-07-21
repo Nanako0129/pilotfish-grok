@@ -163,7 +163,7 @@ session when they share one evidence chain—do not turn that into a sequential
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.0 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.1 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -266,13 +266,30 @@ mech-executor = "your-cheaper-model-id"
 
 Policy text stays the same.
 
+## Verification
+
+```sh
+# Static contracts (offline)
+python3 -m unittest discover -s tests -v
+
+# Install surface + grok inspect (no model spend)
+python3 benchmarks/e2e-dispatch/run.py --skip-live
+
+# Live spawn + capability_mode proof (needs auth + spend)
+python3 benchmarks/e2e-dispatch/run.py
+# or: PILOTFISH_GROK_E2E=1 python3 -m unittest tests.test_e2e_dispatch -v
+```
+
+See [benchmarks/e2e-dispatch/README.md](./benchmarks/e2e-dispatch/README.md).
+
 ## Limitations (v1.0)
 
-- Static template contracts are tested; live spawn/capability e2e is not yet automated.
+- Live e2e proves **forced** role spawn and capability application, not that the
+  orchestrator always chooses the right role unprompted.
 - Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.
-- Headless / non-interactive multi-agent behavior depends on Grok Build; interactive TUI is the supported path.
+- Live e2e needs credentials and is not free; default CI stays on static tests.
 
 ## Uninstall
 

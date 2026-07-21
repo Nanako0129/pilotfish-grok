@@ -2,6 +2,23 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.1] — 2026-07-21
+
+### Added
+
+- Live e2e dispatch proof under `benchmarks/e2e-dispatch/`: headless `grok -p`
+  spawns `scout`, `plan-verifier`, and `verifier`, asserts
+  `subagent_spawned.capability_mode` from session `updates.jsonl`, and records
+  measured cost/time in `results.json`.
+- Optional unittest hooks (`tests/test_e2e_dispatch.py`): install-only probe by
+  default when Grok + install are present; full live run when
+  `PILOTFISH_GROK_E2E=1`.
+
+### Notes
+
+- Measured local live pass (Grok 0.2.106): three cases OK in ~51s wall,
+  ~$0.18 total; scout/plan-verifier `read-only`, verifier `execute`.
+
 ## [1.0.0] — 2026-07-21
 
 ### Added
