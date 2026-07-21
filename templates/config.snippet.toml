@@ -1,0 +1,20 @@
+# Pilotfish-grok owned keys. Merge into ~/.grok/config.toml.
+# Do not force the main-session model or default_reasoning_effort —
+# those stay under the user's control.
+
+[subagents]
+enabled = true
+
+# Optional multi-model pins (highest priority over agent frontmatter).
+# Leave commented to inherit the parent session model. When cheaper models
+# exist in your catalog, pin recon/mechanical roles here without editing policy.
+#
+# [subagents.models]
+# scout = "grok-4.5"
+# plan-verifier = "grok-4.5"
+# security-reviewer = "grok-4.5"
+# mech-executor = "grok-4.5"
+# executor = "grok-4.5"
+# verifier = "grok-4.5"
+# security-executor = "grok-4.5"
+# explore = "grok-4.5"   # built-in explore only; pilotfish-grok does not install an Explore agent
