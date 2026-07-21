@@ -18,6 +18,24 @@ port pattern follows [pilotfish-codex](https://github.com/miyago9267/pilotfish-c
 
 [繁體中文](./README.zh-TW.md)
 
+## Contents
+
+- [Why](#why)
+- [How it works](#how-it-works)
+- [Architecture](#architecture)
+- [Lifecycle](#lifecycle)
+- [Install](#install)
+- [Trust & security](#trust--security)
+- [What gets installed](#what-gets-installed)
+- [Dual harness with Claude pilotfish](#dual-harness-with-claude-pilotfish)
+- [Updating](#updating)
+- [Model routing](#model-routing)
+- [Limitations](#limitations-v10)
+- [Uninstall](#uninstall)
+- [Versioning](#versioning)
+- [Research & design](#research--design)
+- [License](#license)
+
 ## Why
 
 A coding session spends most tokens on search, mechanical edits, tests, and
@@ -45,6 +63,17 @@ Three layers, all under `~/.grok/`:
 | **Roles** | `agents/*.md` + `roles/*.toml` | Seven contracts with capability + effort |
 | **Policy** | `rules/pilotfish-grok.md` | When to delegate and to which role |
 
+```mermaid
+flowchart LR
+    CFG["Machine<br/>~/.grok/config.toml"] --> ORCH["Main session<br/>orchestrator"]
+    POL["Policy<br/>rules/pilotfish-grok.md<br/>roles only — no model IDs"] --> ORCH
+    ORCH --> AG["Roles<br/>agents/*.md + roles/*.toml"]
+    AG --> M["Model catalog<br/>+ reasoning effort"]
+```
+
+> **Core invariant:** policy names **roles**, never model IDs. Change routing in
+> agent/role files or `[subagents.models]`; leave the policy alone.
+
 ### The seven Grok roles
 
 | Role | Capability | Effort | When |
@@ -61,6 +90,35 @@ Three layers, all under `~/.grok/`:
 > to shadow Claude Code's built-in agent. Grok needs no such shim; `scout` owns
 > discovery. Built-in `explore` remains available if you want it.
 
+`verifier` uses **`execute`** (read + shell, no file edits), not `read-only`, so
+it can reproduce tests without writing fixes.
+
+## Architecture
+
+End-to-end flow: you talk to the main session; it spawns named leaf roles and
+integrates their results. Subagents cannot spawn further subagents (Grok depth
+limit = 1).
+
+```mermaid
+flowchart TD
+    U[You] --> O
+    subgraph MAIN["Main session — your default model"]
+        O["Orchestrator<br/>plan / decide / spec / integrate / judge"]
+    end
+    O -->|recon| S["scout<br/>read-only · effort low"]
+    O -->|Plan challenge| PV["plan-verifier<br/>read-only · effort medium"]
+    PV -->|READY / REVISE| O
+    O -->|security evidence| SR["security-reviewer<br/>read-only · effort high"]
+    SR --> O
+    O -->|mechanical spec| M["mech-executor<br/>all · effort low"]
+    O -->|judgment work| E["executor<br/>all · effort medium"]
+    O -->|approved security work| SEC["security-executor<br/>all · effort high"]
+    M --> V["verifier<br/>execute · effort medium"]
+    E --> V
+    SEC --> V
+    V -->|CONFIRMED / REFUTED| O
+```
+
 ### Dispatch principles
 
 - Keep planning, architecture, ambiguity resolution, and final judgment in the main session.
@@ -68,6 +126,34 @@ Three layers, all under `~/.grok/`:
 - Give writing agents exclusive ownership or `isolation: "worktree"`.
 - Do not override `model` or `capability_mode` on named roles at spawn time.
 - Treat delegated results as evidence. Non-trivial changes get a fresh `verifier` pass.
+- Long-running processes stay main-session owned: leaves return exact command + cwd/worktree + env for handoff.
+
+## Lifecycle
+
+Large or ambiguous work uses a phase-aware gate. Small, local, already-stable
+work stays direct in the main session—no ceremony required.
+
+```mermaid
+flowchart LR
+    D[Discovery] --> P[Plan]
+    P --> A[Approval]
+    A --> E[Execution]
+    E --> V[Verification]
+    V -->|REFUTED| E
+    V -->|CONFIRMED| Done[Done]
+```
+
+| Phase | Gate | Eligible delegation |
+|---|---|---|
+| **Discovery** | Stable question, scope, evidence format, stop condition | Bounded read-only `scout` on disjoint surfaces |
+| **Plan** | One Plan: outcome, non-goals, ownership, sequence, verification | Fresh `plan-verifier` → `READY` / `REVISE` |
+| **Approval** | Explicit user approval for large / risky / plan-first work | Read-only only; no implementation brief yet |
+| **Execution** | Stable contract with exclusive ownership and done criteria | `mech-executor` / `executor` / `security-executor` |
+| **Verification** | Concrete claim to refute | Fresh `verifier` → `CONFIRMED` / `REFUTED` |
+
+A single unknown bug's diagnosis, first fix, and live check stay in the main
+session when they share one evidence chain—do not turn that into a sequential
+`scout` → `executor` pipeline.
 
 ## Install
 
@@ -76,7 +162,7 @@ Three layers, all under `~/.grok/`:
 From a local clone (recommended):
 
 ```sh
-git clone https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.0 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -91,6 +177,25 @@ Show me the full plan of changes and get my approval before writing anything.
 The agent will preflight your `~/.grok/` state, show a merge plan, and wait for
 approval. Install is idempotent—re-running upgrades in place.
 
+Convenience (unpinned `main`):
+
+```text
+Read https://raw.githubusercontent.com/Nanako0129/pilotfish-grok/main/install/AGENT-INSTALL.md
+and follow it to install pilotfish-grok into my global Grok Build configuration.
+Show me the full plan of changes and get my approval before writing anything.
+```
+
+Prefer the local clone path so you can review templates before the agent applies them.
+
+## Trust & security
+
+pilotfish-grok is installed by an agent that merges files into `~/.grok/` for
+**every future session**. Treat the install prompt like any remote runbook:
+
+- Read [templates/](./templates/) yourself before approving writes.
+- Pin to a release tag or commit when you need a frozen surface.
+- Keep the approval gate: the agent must not write until you accept the plan.
+
 ## What gets installed
 
 | Target | Change |
@@ -99,27 +204,102 @@ approval. Install is idempotent—re-running upgrades in place.
 | `~/.grok/agents/` | Seven markdown agent definitions |
 | `~/.grok/roles/` | Seven TOML role defaults (capability + effort) |
 | `~/.grok/rules/pilotfish-grok.md` | Orchestration block between `pilotfish-grok` markers |
+| `~/.grok/backups/` | Pristine config + rules backups on install/upgrade |
+
+```text
+~/.grok/
+├── config.toml              # [subagents] + optional [subagents.models]
+├── agents/                  # 7× role contracts (markdown)
+├── roles/                   # 7× capability + reasoning_effort
+├── rules/
+│   └── pilotfish-grok.md    # phase policy (markers)
+└── backups/                 # installer backups
+```
 
 Fresh installs touch only `~/.grok/`. **Claude Code's `~/.claude/` is never
-modified.** If Claude pilotfish is already present, the installer warns about
-dual-load via Grok's Claude compatibility layer.
+modified.**
+
+## Dual harness with Claude pilotfish
+
+If Claude pilotfish is already installed, Grok's default Claude compatibility
+may also load `~/.claude/CLAUDE.md` / agents. The installer warns about this.
+
+For a **Grok-primary agent roster** after install, you can set:
+
+```toml
+# ~/.grok/config.toml
+[compat.claude]
+agents = false   # disable Claude named instruction agents for Grok
+```
+
+Notes:
+
+- This does not uninstall Claude pilotfish; Claude Code keeps using `~/.claude/`.
+- Grok may still surface some `~/.claude/agents/*` files depending on version;
+  same-name roles from `~/.grok/agents/` win for pilotfish-grok names.
+- Skills and other Claude compat cells remain independently configurable.
 
 ## Updating
 
 Re-run the install prompt. The installer reads the version stamp in the rules
-file, shows the changelog delta, and applies changes idempotently.
+file (`<!-- pilotfish-grok vX.Y.Z -->`), shows the changelog delta, and applies
+changes idempotently—identical files are skipped; customized files require a
+diff approval.
+
+## Model routing
+
+| Knob | Where | Default in v1.0 |
+|---|---|---|
+| Main session model | your `/model` or `[models] default` | **unchanged** by installer |
+| Role model | agent `model:` + `[subagents.models].<role>` | `inherit` (parent model) |
+| Reasoning effort | `~/.grok/roles/*.toml` | low / medium / high per role table |
+| Capability | `default_capability_mode` in role TOML | read-only / execute / all |
+
+When a cheaper model appears in `grok models`, pin recon or mechanical roles:
+
+```toml
+[subagents.models]
+scout = "your-cheaper-model-id"
+mech-executor = "your-cheaper-model-id"
+```
+
+Policy text stays the same.
 
 ## Limitations (v1.0)
 
 - Static template contracts are tested; live spawn/capability e2e is not yet automated.
-- Parent plan mode does not block write-capable subagents—read-only roles rely on role capability defaults.
+- Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.
+- Headless / non-interactive multi-agent behavior depends on Grok Build; interactive TUI is the supported path.
+
+## Uninstall
+
+Ask an agent to follow the Uninstall section of
+[install/AGENT-INSTALL.md](./install/AGENT-INSTALL.md), or reverse manually:
+
+1. Delete the seven files under `~/.grok/agents/` and `~/.grok/roles/` that match
+   the templates (diff first if customized).
+2. Remove the `<!-- pilotfish-grok:begin -->` … `<!-- pilotfish-grok:end -->`
+   block from `~/.grok/rules/pilotfish-grok.md` (delete the file if empty).
+3. Restore or remove pilotfish-grok-owned keys in `config.toml` using the oldest
+   `~/.grok/backups/config.toml.pilotfish-grok-*` when appropriate.
 
 ## Versioning
 
 pilotfish-grok uses its own semantic versioning. Upstream pilotfish versions are
 attribution / compatibility notes only.
+
+| Project | Host | Markers | Roles |
+|---|---|---|---|
+| [pilotfish](https://github.com/Nanako0129/pilotfish) | Claude Code | `pilotfish` | 8 (incl. Explore) |
+| [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) | Codex CLI | `pilotfish-codex` | 7 |
+| **pilotfish-grok** | Grok Build | `pilotfish-grok` | 7 |
+
+## Research & design
+
+- [docs/design.md](./docs/design.md) — three-layer mapping, capability rationale, deliberately left out
+- Upstream research lives in the [pilotfish docs](https://github.com/Nanako0129/pilotfish/tree/main/docs)
 
 ## License
 
