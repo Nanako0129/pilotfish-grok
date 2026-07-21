@@ -66,8 +66,9 @@ edits).
 3. Agent prompt contracts (leaf language, no-edit language)
 4. Orchestrator discipline: do not override `capability_mode` on named roles
 
-Parent **plan mode does not protect child writes**. Read-only roles must not
-rely on the parent remaining in plan mode.
+Parent **Plan Mode does not protect child writes**. The mandatory
+`plan-verifier` therefore keeps its own `read-only` role capability instead of
+relying on the parent remaining in Plan Mode.
 
 ## Effort-first economics
 
@@ -87,6 +88,15 @@ Role matching makes work eligible for delegation; it does not make delegation
 mandatory. The main session retains framing, Plan synthesis, architecture,
 ambiguity resolution, integration, and final judgment.
 
+Plan readiness is the deliberate exception to optional role dispatch. For
+large, ambiguous, architectural, risky, or explicitly plan-first work, the
+orchestrator calls `enter_plan_mode` before repository discovery, writes the
+session `plan.md`, and sends the full Plan to a fresh read-only
+`plan-verifier`. `REVISE` returns ownership to the main session; only `READY`
+allows `exit_plan_mode` to open the native approval surface. The same readiness
+gate applies when the user entered Plan Mode with `/plan`. Automatic permission
+grants are tool authorization, not approval of the implementation Plan.
+
 A single unknown bug should not become a sequential `scout` → `executor`
 pipeline when diagnosis, patch design, and live verification share one evidence
 chain.
@@ -98,7 +108,7 @@ chain.
 | Eighth `Explore` agent | No Claude-style shadow need; `scout` is enough |
 | Forced main-session model | User-controlled; Grok has no `best` alias story |
 | Claude-style baton gate | [e2e-dispatch](../benchmarks/e2e-dispatch/README.md) covers adversarial approval bypass plus forced spawn plumbing, not a complete multi-turn Baton workflow |
-| Unprompted orchestrator routing eval | e2e forces role names; free-form role choice quality is out of scope |
+| General unprompted role-routing eval | `ambient-native-plan` covers the mandatory Plan lifecycle; free-form role choice outside that gate remains out of scope |
 | Enforcement hooks | Policy-first, matching Pilotfish philosophy |
 | Per-project install | Global `~/.grok/` is the product surface |
 | Editing `~/.claude/` | Dual-harness coexistence; Claude pilotfish remains independent |

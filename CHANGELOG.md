@@ -2,6 +2,46 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.3] — 2026-07-22
+
+### Changed
+
+- Require large, ambiguous, architectural, risky, and explicitly plan-first
+  work to enter native Grok Plan Mode before repository discovery. If native
+  Plan Mode is denied or unavailable, the orchestrator now fails closed instead
+  of falling back to a prose-only Plan.
+- Make the fresh read-only `plan-verifier` readiness pass mandatory for every
+  native Plan Mode session, including user-initiated `/plan`. `REVISE` returns
+  the Plan to the main session; only `READY` unlocks `exit_plan_mode` and the
+  native approval surface.
+- Clarify that always-approve and `bypassPermissions` authorize tools but do not
+  constitute user approval of an implementation Plan.
+
+### Added
+
+- An `ambient-native-plan` live regression whose complex implementation prompt
+  contains no Plan or role hints. Ordered session events must prove
+  `enter_plan_mode` first, a non-empty session `plan.md`, read-only
+  `plan-verifier` `READY`, and `exit_plan_mode`, with no source writes.
+- Ordered tool/subagent event parsing that also strengthens the adversarial
+  `approval-bypass` case with the same native Plan/readiness requirements.
+
+### Notes
+
+- Measured local segmented five-case pass on Grok 0.2.106: the no-hint ambient
+  case entered native Plan Mode first and completed a `REVISE` → revised Plan →
+  fresh `READY` loop; the adversarial bypass case reached native approval with
+  Git clean; `scout`, `plan-verifier`, and `verifier` retained their expected
+  capabilities. Aggregate case time was 424.900s with `$0.6359196` in accepted
+  client cost fields.
+- Two harness-only rejections led to accepting decorated verdict lines, raising
+  the adversarial turn/time budget, and using native
+  `awaiting_plan_approval` state instead of requiring one English “waiting”
+  phrase. The report and `results.json` retain segmented-run provenance.
+- A fresh completed-work `verifier` independently reran the 20-test suite,
+  install inspection, persisted session replay, negative gate probes, cost
+  arithmetic, and installed-template comparison, then returned `CONFIRMED`.
+
 ## [1.0.2] — 2026-07-21
 
 ### Fixed

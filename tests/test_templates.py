@@ -129,6 +129,8 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("run_terminal_command", policy)
         self.assertIn("delegation-planning layer", policy)
         self.assertIn("Never swap `plan-verifier` and `verifier`", policy)
+        self.assertIn("first tool call MUST be", policy)
+        self.assertIn("Only a `READY` verdict permits `exit_plan_mode`", policy)
         self.assertNotIn("run_in_background", policy)
         self.assertNotIn("Bash(", policy)
 
@@ -158,12 +160,16 @@ class TemplateContractTests(unittest.TestCase):
         for role in ROUTING:
             self.assertIn(f"`{role}`", readme)
 
+        self.assertIn("enter_plan_mode", readme)
+        self.assertIn("Mandatory fresh read-only `plan-verifier`", readme)
+
     def test_design_explains_grok_adaptation_boundary(self) -> None:
         design = (ROOT / "docs" / "design.md").read_text(encoding="utf-8")
         self.assertIn("capability_mode", design)
         self.assertIn("Explore", design)
         self.assertIn("policy names roles but never embeds", design)
         self.assertIn("plan mode", design.lower())
+        self.assertIn("Plan readiness is the deliberate exception", design)
 
 
 if __name__ == "__main__":

@@ -131,13 +131,20 @@ flowchart TD
 
 ## Lifecycle
 
-Large or ambiguous work uses a phase-aware gate. Small, local, already-stable
-work stays direct in the main session—no ceremony required.
+Large, ambiguous, architectural, risky, or explicitly plan-first work must
+enter native Grok Plan Mode before discovery. Every native Plan—including one
+started by the user with `/plan`—must receive a fresh read-only
+`plan-verifier` `READY` verdict before `exit_plan_mode` may present it for
+approval. Small, local, already-stable work stays direct in the main session.
 
 ```mermaid
 flowchart LR
-    D[Discovery] --> P[Plan]
-    P --> A[Approval]
+    R[Complex request] --> N[enter_plan_mode]
+    N --> D[Read-only discovery]
+    D --> P[Session plan.md]
+    P --> PV[Fresh plan-verifier]
+    PV -->|REVISE| P
+    PV -->|READY| A[exit_plan_mode and approval]
     A --> E[Execution]
     E --> V[Verification]
     V -->|REFUTED| E
@@ -146,9 +153,9 @@ flowchart LR
 
 | Phase | Gate | Eligible delegation |
 |---|---|---|
-| **Discovery** | Stable question, scope, evidence format, stop condition | Bounded read-only `scout` on disjoint surfaces |
-| **Plan** | One Plan: outcome, non-goals, ownership, sequence, verification | Fresh `plan-verifier` → `READY` / `REVISE` |
-| **Approval** | Explicit user approval for large / risky / plan-first work | Read-only only; no implementation brief yet |
+| **Discovery** | Native Plan Mode active; stable question, scope, evidence format, stop condition | Bounded read-only `scout` on disjoint surfaces |
+| **Plan** | Session `plan.md`: outcome, non-goals, ownership, sequence, verification | Mandatory fresh read-only `plan-verifier` → `READY` / `REVISE` |
+| **Approval** | `READY` unlocks `exit_plan_mode`; user approves the verified Plan | Read-only only; no implementation brief yet |
 | **Execution** | Stable contract with exclusive ownership and done criteria | `mech-executor` / `executor` / `security-executor` |
 | **Verification** | Concrete claim to refute | Fresh `verifier` → `CONFIRMED` / `REFUTED` |
 
@@ -163,7 +170,7 @@ session when they share one evidence chain—do not turn that into a sequential
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.2 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.3 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -286,9 +293,10 @@ The instruction-surface comparison and approval-gate ablations are documented in
 
 ## Limitations (v1.0)
 
-- Live e2e proves the adversarial approval-bypass gate plus **forced** role spawn
-  and capability application. It does not prove that the orchestrator always
-  chooses the right role unprompted.
+- Live e2e proves ambient native Plan entry, mandatory Plan readiness review,
+  the adversarial approval-bypass gate, and **forced** role capability
+  application. It does not prove general unprompted role choice outside the
+  mandatory Plan lifecycle.
 - Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.

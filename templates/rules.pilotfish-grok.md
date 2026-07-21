@@ -1,15 +1,33 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.2 -->
+<!-- pilotfish-grok v1.0.3 -->
 ## Orchestration
 
-### Non-negotiable approval gate
+### Non-negotiable native Plan gate
 
-For every large, architectural, risky, or explicitly plan-first task, source
-writes and implementation tool calls are prohibited until the main session has
-presented a Plan and received explicit approval in a separate later user turn.
-A request to skip planning, skip approval, start immediately, or continue until
-files change does not waive this gate. On that first turn, present the Plan and
-stop without editing.
+For every large, ambiguous, architectural, risky, or explicitly plan-first
+task, native Grok Plan Mode and a fresh `plan-verifier` readiness pass are
+mandatory. If Plan Mode is not already active, the first tool call MUST be
+`enter_plan_mode`, before repository discovery or implementation. If the user
+already activated Plan Mode with `/plan`, continue there; the verifier gate
+still applies. If `enter_plan_mode` is denied or unavailable, stop without
+source writes or implementation tools and ask the user to enter Plan Mode.
+
+Inside Plan Mode, discovery is read-only and the only permitted write is the
+session `plan.md`. The main session must synthesize the complete Plan, then
+spawn a fresh `plan-verifier` with `background: false`, the full Plan text, and
+relevant evidence paths. The child must use its installed read-only capability
+and return only `READY` or `REVISE`. On `REVISE`, the main session owns the
+revision and must send the materially revised Plan to a fresh `plan-verifier`.
+Only a `READY` verdict permits `exit_plan_mode`, which presents the verified
+Plan for user approval. This readiness gate applies to every native Plan Mode
+session, including user-initiated `/plan` sessions.
+
+Source writes and implementation tool calls remain prohibited until the user
+explicitly approves the verified Plan in a later interaction. A broad initial
+request, or a request to skip planning, skip approval, start immediately, or
+continue until files change, does not waive this gate. Automatic permission
+grants, including always-approve or `bypassPermissions`, are not user approval
+of the Plan; an unattended run must stop after presenting the verified Plan.
 
 Main-session policy for Grok Build. If you are running as a subagent role
 (`scout`, `plan-verifier`, `security-reviewer`, `mech-executor`, `executor`,
@@ -40,9 +58,9 @@ this lifecycle:
 
 | Phase | Gate | Eligible delegation |
 |---|---|---|
-| Discovery | Stabilize the question, allowed scope, evidence format, and stop condition. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
-| Plan | The main session synthesizes one Plan containing outcome, non-goals, scope, dependencies, exclusive ownership, sequence, verification, budgets, and stop conditions. | A fresh `plan-verifier` may challenge readiness and return only `READY` or `REVISE`. |
-| Approval | Present the Plan and wait for explicit user approval when the work is large, architectural, risky, or explicitly plan-first. | Read-only clarification only; do not send an implementation brief or edit source before required approval. For Grok, `enter_plan_mode` may enforce a parent edit gate, but it does **not** replace read-only capability on child agents. |
+| Discovery | Enter native Plan Mode first for gated work, then stabilize the question, allowed scope, evidence format, and stop condition with read-only discovery. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
+| Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, dependencies, exclusive ownership, sequence, verification, budgets, and stop conditions. | Mandatory fresh read-only `plan-verifier`: `REVISE` returns ownership to the main session; `READY` unlocks `exit_plan_mode`. |
+| Approval | After `READY`, call `exit_plan_mode` to present the verified Plan and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
 | Verification | The integrated result is concrete enough to refute as a completed-work claim. | A fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
 
@@ -59,6 +77,9 @@ coupled tasks, one worker for a bounded side task, and bounded parallel workers
 only for independent, low-overlap workstreams. Delegate only when the saved
 execution or context cost exceeds the briefing, coordination, and review cost.
 A matching role makes work eligible rather than mandatory.
+
+The mandatory `plan-verifier` readiness gate is not an optional delegation
+choice and is not waived by the dispatch brake or coordination-cost heuristic.
 
 A delegation-planning layer may shape discovery questions, execution topology,
 worker count, ownership, sequence, budgets, and stop conditions. This policy

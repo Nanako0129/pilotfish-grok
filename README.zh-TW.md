@@ -113,12 +113,20 @@ flowchart TD
 
 ## 生命週期
 
-大型或模糊工作走階段閘。小而穩定的工作直接在主 session 做，不必儀式。
+大型、模糊、架構、高風險或明確 plan-first 的工作，必須先進入 Grok
+原生 Plan Mode 才能 discovery。每份 native Plan——包含使用者用 `/plan`
+啟動的 Plan——都必須經 fresh read-only `plan-verifier` 回傳 `READY`，
+才能用 `exit_plan_mode` 交給使用者批准。小而穩定的工作仍由主 session
+直接完成。
 
 ```mermaid
 flowchart LR
-    D[Discovery] --> P[Plan]
-    P --> A[Approval]
+    R[複雜需求] --> N[enter_plan_mode]
+    N --> D[唯讀 discovery]
+    D --> P[Session plan.md]
+    P --> PV[Fresh plan-verifier]
+    PV -->|REVISE| P
+    PV -->|READY| A[exit_plan_mode 與批准]
     A --> E[Execution]
     E --> V[Verification]
     V -->|REFUTED| E
@@ -127,9 +135,9 @@ flowchart LR
 
 | 階段 | 閘門 | 可委派 |
 |---|---|---|
-| **Discovery** | 問題、範圍、證據格式、停止條件穩定 | 有界唯讀 `scout` |
-| **Plan** | 一份 Plan：outcome、non-goals、ownership、序列、驗證 | fresh `plan-verifier` → `READY` / `REVISE` |
-| **Approval** | 大型／高風險／plan-first 需明確批准 | 僅唯讀；尚不送 implementation brief |
+| **Discovery** | Native Plan Mode 已啟用；問題、範圍、證據格式、停止條件穩定 | 有界唯讀 `scout` |
+| **Plan** | Session `plan.md`：outcome、non-goals、ownership、序列、驗證 | 強制 fresh read-only `plan-verifier` → `READY` / `REVISE` |
+| **Approval** | `READY` 才能 `exit_plan_mode`；使用者批准已驗證 Plan | 僅唯讀；尚不送 implementation brief |
 | **Execution** | 穩定 contract、獨佔 ownership、done criteria | `mech-executor` / `executor` / `security-executor` |
 | **Verification** | 可被推翻的完成宣稱 | fresh `verifier` → `CONFIRMED` / `REFUTED` |
 
@@ -142,7 +150,7 @@ flowchart LR
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.2 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.3 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -257,7 +265,7 @@ python3 benchmarks/e2e-dispatch/run.py
 
 ## 限制（v1.0）
 
-- Live e2e 證明 adversarial approval-bypass gate、**強制**派出角色與 capability 套用；不代表 orchestrator 在無人提示時一定選對角色
+- Live e2e 證明 ambient native Plan entry、強制 Plan readiness review、adversarial approval-bypass gate 與**強制**角色 capability；不代表 mandatory Plan lifecycle 之外的 ambient 角色選擇一定正確
 - 父 session plan mode **不**擋子代理寫入——唯讀靠 role capability
 - 單一模型目錄沒有多模型價差套利；effort 與 context 節省仍成立
 - 不卸載、不改寫 Claude pilotfish
