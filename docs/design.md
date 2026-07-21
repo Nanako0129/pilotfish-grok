@@ -1,15 +1,14 @@
 # pilotfish-grok Design Rationale
 
-> This is my Grok Build line of
-> [pilotfish](https://github.com/Nanako0129/pilotfish). Same architecture and
-> phase-aware lifecycle; install surface and capability primitives are native
-> Grok. Packaging lessons from the seven-role host port also show up in
-> [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) (Miyago's
-> Codex line). pilotfish-grok has its own release train.
+> Grok Build port of [pilotfish](https://github.com/Nanako0129/pilotfish)
+> orchestration. Same architecture and phase-aware lifecycle; install surface
+> and capability primitives are native Grok. The seven-role host-port shape
+> also appears in [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex).
+> This project has its own release train.
 
 ## Purpose
 
-Carry pilotfish's separation of concerns and phase-aware orchestration into
+Preserve pilotfish's separation of concerns and phase-aware orchestration in
 native Grok Build configuration. Role-based policy, approval gates, leaf
 workers, and fresh-context verification stay; Claude-specific mechanisms
 (`settings.json`, `tools:` allowlists, `Explore` shadowing, Sonnet buckets)
@@ -106,12 +105,11 @@ chain.
 
 ## Relationship to siblings
 
-| Project | Host | Policy markers | Roles | Maintainer |
-|---|---|---|---|---|
-| pilotfish | Claude Code | `pilotfish` | 8 (incl. Explore) | me |
-| pilotfish-grok | Grok Build | `pilotfish-grok` | 7 | me |
-| pilotfish-codex | Codex CLI | `pilotfish-codex` | 7 | Miyago |
+| Project | Host | Policy markers | Roles |
+|---|---|---|---|
+| pilotfish | Claude Code | `pilotfish` | 8 (incl. Explore) |
+| pilotfish-grok | Grok Build | `pilotfish-grok` | 7 |
+| pilotfish-codex | Codex CLI | `pilotfish-codex` | 7 |
 
-I review changes on the Claude Code line and pull them into Grok when they
-still make sense here. Source parity with pilotfish is not a goal by itself;
-Grok-specific needs win.
+Useful pilotfish changes may be adapted when they fit Grok. Source parity is
+not an independent goal; Grok-specific needs take priority.
