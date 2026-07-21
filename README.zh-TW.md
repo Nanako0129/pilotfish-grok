@@ -1,13 +1,13 @@
 # pilotfish-grok
 
-> Grok Build 原生的多模型編排層，靈感來自
-> [pilotfish](https://github.com/Nanako0129/pilotfish)。
+> [pilotfish](https://github.com/Nanako0129/pilotfish) 的 Grok Build 線——
+> 同一套編排思路，安裝面改成原生 `~/.grok/`。
 
-**pilotfish-grok** 是 Pilotfish 編排在 Grok Build 上的獨立適配線。它保留機器設定、角色綁定、無模型名政策的三層分離，並把 lifecycle 與能力邊界翻成 Grok 原生 agents / roles。品質靠明確批准閘與 fresh-context 驗證，而不是每一步都用最強模型。
+**pilotfish-grok** 是我把為 Claude Code 做的多模型編排，移植到 Grok Build 的那條線。它保留機器設定、角色綁定、無模型名政策的三層分離，並把 lifecycle 與能力邊界翻成 Grok 原生 agents / roles。品質靠明確批准閘與 fresh-context 驗證，而不是每一步都用最強模型。
 
 全部安裝在全域 `~/.grok/`：設定一次，所有專案生效。
 
-原始架構歸功於 [@Nanako0129](https://github.com/Nanako0129) 的 pilotfish。七角色宿主移植形態參考 [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex)。
+Claude Code 那側我維護 [pilotfish](https://github.com/Nanako0129/pilotfish)；Grok 這側就是這個 repo。七角色、不安裝 Claude `Explore` 覆寫的宿主移植形態，也出現在 Miyago 的 [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex)（Codex 線）；各宿主各自發版。
 
 [English](./README.md)
 
@@ -255,18 +255,19 @@ mech-executor = "your-cheaper-model-id"
 
 ## 版本
 
-pilotfish-grok 使用獨立 semver。上游 pilotfish 版號只作 attribution／相容註記。
+pilotfish-grok 有自己的 semver。Claude Code 線
+（[pilotfish](https://github.com/Nanako0129/pilotfish)）另外計版；兩邊我會挑有用的改動互相同步，但 tag 互不綁定。
 
-| 專案 | 宿主 | Markers | 角色數 |
-|---|---|---|---|
-| [pilotfish](https://github.com/Nanako0129/pilotfish) | Claude Code | `pilotfish` | 8（含 Explore） |
-| [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) | Codex CLI | `pilotfish-codex` | 7 |
-| **pilotfish-grok** | Grok Build | `pilotfish-grok` | 7 |
+| 專案 | 宿主 | Markers | 角色數 | 維護 |
+|---|---|---|---|---|
+| [pilotfish](https://github.com/Nanako0129/pilotfish) | Claude Code | `pilotfish` | 8（含 Explore） | 我 |
+| **pilotfish-grok** | Grok Build | `pilotfish-grok` | 7 | 我 |
+| [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) | Codex CLI | `pilotfish-codex` | 7 | Miyago |
 
 ## 研究與設計
 
-- [docs/design.md](./docs/design.md) — 三層映射、capability 論證、刻意不做的項目
-- 上游研究見 [pilotfish docs](https://github.com/Nanako0129/pilotfish/tree/main/docs)
+- [docs/design.md](./docs/design.md) — Grok 側映射、capability 論證、刻意不做的項目
+- 當初產出整套編排的 Claude 側研究：[pilotfish docs](https://github.com/Nanako0129/pilotfish/tree/main/docs)
 
 ## 授權
 

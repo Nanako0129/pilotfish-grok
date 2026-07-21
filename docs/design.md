@@ -1,14 +1,15 @@
 # pilotfish-grok Design Rationale
 
-> pilotfish-grok is a Grok Build adaptation of
-> [Pilotfish](https://github.com/Nanako0129/pilotfish). The architecture and
-> orchestration lifecycle derive from Pilotfish; Codex-facing packaging lessons
-> come from [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex).
-> This project has its own release line.
+> This is my Grok Build line of
+> [pilotfish](https://github.com/Nanako0129/pilotfish). Same architecture and
+> phase-aware lifecycle; install surface and capability primitives are native
+> Grok. Packaging lessons from the seven-role host port also show up in
+> [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) (Miyago's
+> Codex line). pilotfish-grok has its own release train.
 
 ## Purpose
 
-Preserve Pilotfish's separation of concerns and phase-aware orchestration in
+Carry pilotfish's separation of concerns and phase-aware orchestration into
 native Grok Build configuration. Role-based policy, approval gates, leaf
 workers, and fresh-context verification stay; Claude-specific mechanisms
 (`settings.json`, `tools:` allowlists, `Explore` shadowing, Sonnet buckets)
@@ -105,11 +106,12 @@ chain.
 
 ## Relationship to siblings
 
-| Project | Host | Policy markers | Roles |
-|---|---|---|---|
-| pilotfish | Claude Code | `pilotfish` | 8 (incl. Explore) |
-| pilotfish-codex | Codex CLI | `pilotfish-codex` | 7 |
-| pilotfish-grok | Grok Build | `pilotfish-grok` | 7 |
+| Project | Host | Policy markers | Roles | Maintainer |
+|---|---|---|---|---|
+| pilotfish | Claude Code | `pilotfish` | 8 (incl. Explore) | me |
+| pilotfish-grok | Grok Build | `pilotfish-grok` | 7 | me |
+| pilotfish-codex | Codex CLI | `pilotfish-codex` | 7 | Miyago |
 
-Upstream Pilotfish improvements are reviewed and selectively adapted when they
-fit Grok Build; source parity is not an independent goal.
+I review changes on the Claude Code line and pull them into Grok when they
+still make sense here. Source parity with pilotfish is not a goal by itself;
+Grok-specific needs win.

@@ -25,5 +25,5 @@ All notable changes to pilotfish-grok are documented in this file.
 
 - v1.0 targets effort-first routing on single-model catalogs; optional
   `[subagents.models]` pins are documented for future multi-model layouts.
-- Upstream Pilotfish attribution: architecture from Nanako0129/pilotfish.
-  Seven-role host-port pattern informed by pilotfish-codex.
+- Same orchestration family as pilotfish (Claude Code line, same maintainer).
+  Seven-role host-port shape also used by pilotfish-codex (Miyago / Codex).

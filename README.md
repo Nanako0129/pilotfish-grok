@@ -1,20 +1,22 @@
 # pilotfish-grok
 
-> Grok Build–native multi-model orchestration, inspired by
-> [pilotfish](https://github.com/Nanako0129/pilotfish).
+> The Grok Build line of [pilotfish](https://github.com/Nanako0129/pilotfish) —
+> same orchestration idea, native `~/.grok/` install surface.
 
-**pilotfish-grok** is an independent Grok Build adaptation of Pilotfish
-orchestration. It keeps the separation between machine configuration, role
-bindings, and model-free policy while translating lifecycle and capability
-boundaries to native Grok agents and roles. Quality comes from explicit
-approval gates and fresh-context verification—not from using the strongest
-model for every step.
+**pilotfish-grok** is my Grok Build port of the multi-model orchestration I
+built for Claude Code. It keeps the separation between machine configuration,
+role bindings, and model-free policy, and maps lifecycle and capability
+boundaries onto Grok agents and roles. Quality comes from explicit approval
+gates and fresh-context verification—not from using the strongest model for
+every step.
 
 Everything installs globally under `~/.grok/`: one setup for every project.
 
-Primary credit for the original architecture goes to
-[@Nanako0129](https://github.com/Nanako0129) (pilotfish). The seven-role host
-port pattern follows [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex).
+I maintain [pilotfish](https://github.com/Nanako0129/pilotfish) for Claude Code
+and this repo for Grok Build. The seven-role host-port shape (no Claude
+`Explore` shadow) also appears in
+[pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) (Miyago's Codex
+line); each host keeps its own release train.
 
 [繁體中文](./README.zh-TW.md)
 
@@ -287,19 +289,20 @@ Ask an agent to follow the Uninstall section of
 
 ## Versioning
 
-pilotfish-grok uses its own semantic versioning. Upstream pilotfish versions are
-attribution / compatibility notes only.
+pilotfish-grok has its own semver. The Claude Code line
+([pilotfish](https://github.com/Nanako0129/pilotfish)) versions separately; I
+pull useful ideas across when they fit, but neither tag dictates the other.
 
-| Project | Host | Markers | Roles |
-|---|---|---|---|
-| [pilotfish](https://github.com/Nanako0129/pilotfish) | Claude Code | `pilotfish` | 8 (incl. Explore) |
-| [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) | Codex CLI | `pilotfish-codex` | 7 |
-| **pilotfish-grok** | Grok Build | `pilotfish-grok` | 7 |
+| Project | Host | Markers | Roles | Maintainer |
+|---|---|---|---|---|
+| [pilotfish](https://github.com/Nanako0129/pilotfish) | Claude Code | `pilotfish` | 8 (incl. Explore) | me |
+| **pilotfish-grok** | Grok Build | `pilotfish-grok` | 7 | me |
+| [pilotfish-codex](https://github.com/miyago9267/pilotfish-codex) | Codex CLI | `pilotfish-codex` | 7 | Miyago |
 
 ## Research & design
 
-- [docs/design.md](./docs/design.md) — three-layer mapping, capability rationale, deliberately left out
-- Upstream research lives in the [pilotfish docs](https://github.com/Nanako0129/pilotfish/tree/main/docs)
+- [docs/design.md](./docs/design.md) — Grok-side mapping, capability rationale, deliberately left out
+- Claude-side research that produced the original stack: [pilotfish docs](https://github.com/Nanako0129/pilotfish/tree/main/docs)
 
 ## License
 
