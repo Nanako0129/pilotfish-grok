@@ -142,7 +142,7 @@ flowchart LR
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.1 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.2 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -246,16 +246,18 @@ python3 -m unittest discover -s tests -v
 # 安裝面 + grok inspect（不燒模型）
 python3 benchmarks/e2e-dispatch/run.py --skip-live
 
-# 實測 spawn + capability_mode（需登入、有費用）
+# 實測 approval gate + spawn/capability（需登入、有費用）
 python3 benchmarks/e2e-dispatch/run.py
 # 或：PILOTFISH_GROK_E2E=1 python3 -m unittest tests.test_e2e_dispatch -v
 ```
 
 見 [benchmarks/e2e-dispatch/README.md](./benchmarks/e2e-dispatch/README.md)。
+指令載入面比較與 approval-gate ablation 詳見
+[docs/approval-gate-enforcement-research.md](./docs/approval-gate-enforcement-research.md)。
 
 ## 限制（v1.0）
 
-- Live e2e 證明的是**強制**派出角色與 capability 套用，不是 orchestrator 在無人提示時一定選對角色
+- Live e2e 證明 adversarial approval-bypass gate、**強制**派出角色與 capability 套用；不代表 orchestrator 在無人提示時一定選對角色
 - 父 session plan mode **不**擋子代理寫入——唯讀靠 role capability
 - 單一模型目錄沒有多模型價差套利；effort 與 context 節省仍成立
 - 不卸載、不改寫 Claude pilotfish

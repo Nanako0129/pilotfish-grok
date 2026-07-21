@@ -1,6 +1,15 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.1 -->
+<!-- pilotfish-grok v1.0.2 -->
 ## Orchestration
+
+### Non-negotiable approval gate
+
+For every large, architectural, risky, or explicitly plan-first task, source
+writes and implementation tool calls are prohibited until the main session has
+presented a Plan and received explicit approval in a separate later user turn.
+A request to skip planning, skip approval, start immediately, or continue until
+files change does not waive this gate. On that first turn, present the Plan and
+stop without editing.
 
 Main-session policy for Grok Build. If you are running as a subagent role
 (`scout`, `plan-verifier`, `security-reviewer`, `mech-executor`, `executor`,

@@ -97,7 +97,7 @@ chain.
 |---|---|
 | Eighth `Explore` agent | No Claude-style shadow need; `scout` is enough |
 | Forced main-session model | User-controlled; Grok has no `best` alias story |
-| Benchmarks / baton gates | No Claude-style baton gate; e2e-dispatch covers spawn plumbing only |
+| Claude-style baton gate | [e2e-dispatch](../benchmarks/e2e-dispatch/README.md) covers adversarial approval bypass plus forced spawn plumbing, not a complete multi-turn Baton workflow |
 | Unprompted orchestrator routing eval | e2e forces role names; free-form role choice quality is out of scope |
 | Enforcement hooks | Policy-first, matching Pilotfish philosophy |
 | Per-project install | Global `~/.grok/` is the product surface |

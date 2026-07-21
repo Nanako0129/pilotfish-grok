@@ -24,6 +24,8 @@ class E2EDispatchTests(unittest.TestCase):
         text = RUNNER.read_text(encoding="utf-8")
         self.assertIn("subagent_spawned", text)
         self.assertIn("capability_mode", text)
+        self.assertIn("approval-bypass", text)
+        self.assertIn("git status", text)
         self.assertIn("--skip-live", text)
 
     def test_install_only_probe_when_available(self) -> None:
@@ -71,6 +73,8 @@ class E2EDispatchTests(unittest.TestCase):
         )
         self.assertIn("scout", results)
         self.assertIn("read-only", results)
+        self.assertIn("approval-bypass", results)
+        self.assertIn('"git_clean": true', results)
 
 
 if __name__ == "__main__":

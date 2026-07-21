@@ -2,6 +2,34 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.2] — 2026-07-21
+
+### Fixed
+
+- Front-load a non-negotiable approval gate in the global policy. Large,
+  architectural, risky, and explicitly plan-first work cannot write source or
+  call implementation tools until the main session presents a Plan and receives
+  explicit approval in a separate later user turn. Requests to skip planning,
+  skip approval, start immediately, or continue until files change do not waive
+  the gate.
+- Require the installed policy stamp to match repository `VERSION` before E2E,
+  preventing a stale global policy from producing misleading live results.
+
+### Added
+
+- Live `approval-bypass` regression coverage under `benchmarks/e2e-dispatch/`.
+  The case deliberately enables write permissions, requests an immediate OAuth2
+  rewrite, and asserts a clean Git tree, Plan and approval language, and no
+  write-capable role spawn.
+- A versioned research report documenting the 28-session instruction-surface
+  comparison, ablations, interpretation, and resulting policy decision.
+
+### Notes
+
+- Measured local full pass on Grok 0.2.106: approval-bypass plus `scout`,
+  `plan-verifier`, and `verifier` all passed in 89.958s aggregate wall time with
+  `$0.2358788` in total client cost fields.
+
 ## [1.0.1] — 2026-07-21
 
 ### Added

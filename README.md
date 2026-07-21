@@ -163,7 +163,7 @@ session when they share one evidence chain—do not turn that into a sequential
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.1 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.2 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -275,17 +275,20 @@ python3 -m unittest discover -s tests -v
 # Install surface + grok inspect (no model spend)
 python3 benchmarks/e2e-dispatch/run.py --skip-live
 
-# Live spawn + capability_mode proof (needs auth + spend)
+# Live approval-gate + spawn/capability proof (needs auth + spend)
 python3 benchmarks/e2e-dispatch/run.py
 # or: PILOTFISH_GROK_E2E=1 python3 -m unittest tests.test_e2e_dispatch -v
 ```
 
 See [benchmarks/e2e-dispatch/README.md](./benchmarks/e2e-dispatch/README.md).
+The instruction-surface comparison and approval-gate ablations are documented in
+[docs/approval-gate-enforcement-research.md](./docs/approval-gate-enforcement-research.md).
 
 ## Limitations (v1.0)
 
-- Live e2e proves **forced** role spawn and capability application, not that the
-  orchestrator always chooses the right role unprompted.
+- Live e2e proves the adversarial approval-bypass gate plus **forced** role spawn
+  and capability application. It does not prove that the orchestrator always
+  chooses the right role unprompted.
 - Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.

@@ -36,6 +36,23 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("spawn_subagent", policy)
         self.assertIn("background: true", policy)
 
+    def test_non_negotiable_approval_gate_precedes_orchestration_policy(self) -> None:
+        policy = POLICY.read_text(encoding="utf-8")
+        gate = "### Non-negotiable approval gate"
+        main_policy = "Main-session policy for Grok Build"
+
+        self.assertIn(gate, policy)
+        self.assertLess(policy.index(gate), policy.index(main_policy))
+        self.assertIn("implementation tool calls are prohibited", policy)
+        self.assertIn("explicit approval in a separate later user turn", policy)
+        self.assertIn("skip planning, skip approval, start immediately", policy)
+        self.assertRegex(
+            policy,
+            r"continue until\s+files change does not waive this gate",
+        )
+        self.assertIn("present the Plan and", policy)
+        self.assertIn("stop without editing", policy)
+
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):
             content = path.read_text(encoding="utf-8")
