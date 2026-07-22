@@ -194,7 +194,7 @@ Show me the full plan of changes and get my approval before writing anything.
 
 ```text
 ~/.grok/
-├── config.toml              # [subagents] + 可選 [subagents.models]
+├── config.toml              # native subagents + Claude 隔離 + 可選 model pins
 ├── agents/                  # 7× 角色契約（markdown）
 ├── roles/                   # 7× capability + reasoning_effort
 ├── rules/
@@ -206,21 +206,30 @@ Show me the full plan of changes and get my approval before writing anything.
 
 ## 與 Claude pilotfish 雙 harness
 
-若已安裝 Claude pilotfish，Grok 預設的 Claude 相容層可能一併載入 `~/.claude/CLAUDE.md` / agents。installer 會警告。
-
-安裝後若要以 **Grok 角色表為主**，可設：
+Grok 預設會探索 Claude Code 設定，而且不只 `CLAUDE.md`：skills、命名 agents、MCP、hooks、session scanner 與 Claude plugins 都是獨立輸入。pilotfish-grok 因此會在 `~/.grok/config.toml` 安裝純 Grok 隔離設定：
 
 ```toml
-# ~/.grok/config.toml
+[subagents.toggle]
+"Explore" = false   # 精確封鎖 Claude agent；小寫內建 explore 保持啟用
+
 [compat.claude]
-agents = false   # 對 Grok 關掉 Claude 命名指令 agents
+skills = false
+rules = false
+agents = false
+mcps = false
+hooks = false
+sessions = false
+
+[plugins]
+disabled = ["<grok inspect 找到的每個 Claude plugin 名稱>"]
 ```
 
 說明：
 
 - 不會卸載 Claude pilotfish；Claude Code 仍用 `~/.claude/`
-- 視 Grok 版本，`~/.claude/agents/*` 仍可能出現在列表；同名角色以 `~/.grok/agents/` 為準
-- skills 等其他 compat cell 可獨立調整
+- 實測 Grok 0.2.106 時，`[compat.claude] agents = false` 仍擋不住 `~/.claude/agents/` 自訂 agent；installer 會把每個已探索名稱加入 false 的 `[subagents.toggle]`
+- Claude plugin discovery 不受六個 compat cell 控制；installer 會把所有根目錄位於 `~/.claude/` 的 plugin 合併進 `[plugins] disabled`，保留既有項目
+- `grok inspect` 仍可能列出已停用的 discovery；E2E 以 persisted session 為準，必須沒有 `/.claude/` context marker，也沒有 hook execution event
 
 ## 更新
 
@@ -269,6 +278,7 @@ python3 benchmarks/e2e-dispatch/run.py
 - 父 session plan mode **不**擋子代理寫入——唯讀靠 role capability
 - 單一模型目錄沒有多模型價差套利；effort 與 context 節省仍成立
 - 不卸載、不改寫 Claude pilotfish
+- 純 Grok 隔離只停用 Grok 內的 Claude 衍生輸入。若刻意需要混合 harness，請由 installer 備份還原，且不要把隔離 E2E 當成該模式的代表結果
 - Live e2e 需要憑證且會產生費用；預設 CI 只跑靜態測試
 
 ## 移除

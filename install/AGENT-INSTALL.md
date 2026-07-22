@@ -24,7 +24,7 @@ policy names roles only.
 
 | Target | Change |
 |---|---|
-| `~/.grok/config.toml` | Ensure `[subagents] enabled = true`; leave main model and effort user-controlled; optionally document `[subagents.models]` pins |
+| `~/.grok/config.toml` | Enable native subagents; disable all six Claude compatibility cells, discovered Claude agent types, and discovered Claude plugins; leave main model and effort user-controlled |
 | `~/.grok/agents/` | Seven agent markdown files |
 | `~/.grok/roles/` | Seven role TOML files (capability + reasoning_effort) |
 | `~/.grok/rules/pilotfish-grok.md` | One Orchestration block between `pilotfish-grok:begin` and `pilotfish-grok:end` markers |
@@ -37,9 +37,9 @@ with templates from `main`.
 > **Commit pinning:** If the install prompt names a tag or commit SHA, fetch
 > `VERSION`, `CHANGELOG.md`, and every template from that exact ref.
 
-> **Does not touch Claude Code.** Never modify `~/.claude/`. If Claude pilotfish
-> is already installed, report dual-load risk and optional mitigations; do not
-> uninstall or rewrite it without explicit separate approval.
+> **Does not touch Claude Code.** Never modify `~/.claude/`. Isolation is
+> implemented only in Grok's `~/.grok/config.toml`, so Claude Code keeps its
+> existing instructions, agents, skills, hooks, and plugins.
 
 > **Capability boundary:** Read-only roles set
 > `default_capability_mode = "read-only"` in role TOMLs. Parent plan mode does
@@ -68,8 +68,9 @@ Gather state without writing:
    `spawn_subagent`. If the command is missing, unparsable, or older, **stop
    before the write plan** and ask the user to update Grok Build.
 2. Read `~/.grok/config.toml` if present. Record `[models]`, `[subagents]`,
-   `[subagents.models]`, and `[compat.claude]` if present. Preserve every
-   unrelated key. Note whether a pristine backup already exists under
+   `[subagents.toggle]`, `[subagents.models]`, `[compat.claude]`, and
+   `[plugins] disabled` if present. Preserve every unrelated key. Note whether
+   a pristine backup already exists under
    `~/.grok/backups/config.toml.pilotfish-grok-*`.
 3. Inspect `~/.grok/rules/pilotfish-grok.md` if present. Count
    `pilotfish-grok:begin` markers: must be `0` (fresh) or `1` (upgrade). Stop
@@ -78,21 +79,26 @@ Gather state without writing:
    `name:` and role filenames. Record collisions for all seven roles:
    `scout`, `plan-verifier`, `security-reviewer`, `mech-executor`, `executor`,
    `verifier`, `security-executor`.
-5. If `~/.claude/agents/` exists, list pilotfish-related names (`scout`,
-   `Explore`, `executor`, etc.). Flag dual-load risk: Grok's Claude
-   compatibility (default on) may also load Claude agents and
-   `~/.claude/CLAUDE.md` / `Claude.md`. Optional mitigations (user choice only):
-   - Set `[compat.claude] agents = false` for a pure Grok agent roster, or
-   - Keep both and accept possible name/policy overlap (prefer `~/.grok` native
-     definitions after restart; verify with `grok inspect`).
-6. Do **not** install an `Explore` or `explore` agent file. Built-in `explore`
+5. Run `grok inspect --json`. Record every Claude compatibility cell and every
+   discovered entry whose source or path is under `~/.claude/`. Build two
+   machine-specific deny-lists:
+   - Every Claude agent name, for `[subagents.toggle] <name> = false`.
+   - Every Claude plugin name, for `[plugins] disabled`.
+   Do not infer active state from `plugins[].enabled` alone: Grok may still list
+   a discovered disabled plugin there. Validate component state and persisted
+   sessions in Step 4.
+6. Treat all six `[compat.claude]` cells as one isolation gate: `skills`,
+   `rules`, `agents`, `mcps`, `hooks`, and `sessions` must all be `false`.
+   The `agents` cell does not by itself block custom definitions found under
+   `~/.claude/agents/`; the per-type toggle is also required.
+7. Do **not** install an `Explore` or `explore` agent file. Built-in `explore`
    remains available; `scout` owns pilotfish-grok discovery.
 
 ## Step 2 — Present the plan
 
 Show a table of every intended change: path, create / merge / replace-between-markers /
-skip, and backup plan. Include dual-harness warnings if Step 1 found Claude
-pilotfish. **Do not write anything until the user explicitly approves.** A broad
+skip, and backup plan. Include the exact Claude agent/plugin deny-lists from
+Step 1. **Do not write anything until the user explicitly approves.** A broad
 "install pilotfish-grok" request is not approval of this plan.
 
 ## Step 3 — Apply
@@ -118,9 +124,11 @@ Never rewrite the whole file. From [templates/config.snippet.toml](../templates/
 | Key | Rule |
 |---|---|
 | `[subagents] enabled` | If absent or false → set `true` after approval. If already true → skip. |
+| `[subagents.toggle]` | Set every Claude agent name discovered in Step 1 to `false`. Always keep the exact `"Explore" = false` baseline; do not disable lowercase built-in `explore`. |
 | `[subagents.models]` | Do **not** force pins. Only add keys the user explicitly requested during approval. Leave comments out of the live file unless the user wants a documented stub. |
 | Main `[models] default` | **Never** change unless the user explicitly asked in the approved plan. |
-| `[compat.claude]` | Only change if the approved plan chose a dual-harness mitigation. |
+| `[compat.claude]` | Set `skills`, `rules`, `agents`, `mcps`, `hooks`, and `sessions` to `false`. Preserve unrelated compat vendors. |
+| `[plugins] disabled` | Merge every Claude plugin name discovered in Step 1 into the existing list. Preserve existing entries. Claude plugin discovery is independent of `[compat.claude]`. |
 
 Validate TOML after edit (parse with a TOML library or `python3 -c 'import tomllib; tomllib.load(open(...))'`).
 
@@ -163,11 +171,17 @@ Do not modify other files under `~/.grok/rules/`.
    stamp matches repo `VERSION`.
 4. Each role TOML has the expected `default_capability_mode` and
    `reasoning_effort` from the routing table in the README.
-5. Run `grok inspect` and confirm the seven user agents appear and the rules
-   file is listed under project/home instructions (or rules).
-6. Tell the user to **start a new Grok session**: agents and rules are scanned
+5. Run `grok inspect --json` and confirm the seven native agents appear, the
+   rules file is listed, and all six Claude compatibility cells are `false`.
+   Every discovered Claude agent must have a matching false
+   `[subagents.toggle]` entry; every discovered Claude plugin name must be in
+   `[plugins] disabled`. Direct Claude skills, instructions, MCPs, and hooks may
+   remain visible to inspect only when marked disabled.
+6. Run `python3 benchmarks/e2e-dispatch/run.py --skip-live` from the matching
+   repository ref when available. It is the fail-closed isolation/install gate.
+7. Tell the user to **start a new Grok session**: agents and rules are scanned
    at session start.
-7. Summarize what changed, what was skipped, dual-harness notes, and backup
+8. Summarize what changed, what was skipped, isolation notes, and backup
    paths.
 
 Optional manual smoke (user or agent after restart):
@@ -175,6 +189,10 @@ Optional manual smoke (user or agent after restart):
 - Spawn `plan-verifier` on a dummy plan and confirm it cannot edit files.
 - Spawn `verifier` and confirm it can run a read-only shell command but should
   refuse to edit (capability `execute`).
+- Attempt the exact case-sensitive Claude agent names from Step 1 and confirm
+  Grok rejects them as disabled. For a full live run, each persisted session
+  must contain zero `/.claude/` context markers and zero `hook_execution`
+  events.
 
 ## Uninstall
 

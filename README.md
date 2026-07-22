@@ -216,7 +216,7 @@ pilotfish-grok is installed by an agent that merges files into `~/.grok/` for
 
 ```text
 ~/.grok/
-├── config.toml              # [subagents] + optional [subagents.models]
+├── config.toml              # native subagents + Claude isolation + optional model pins
 ├── agents/                  # 7× role contracts (markdown)
 ├── roles/                   # 7× capability + reasoning_effort
 ├── rules/
@@ -229,23 +229,39 @@ modified.**
 
 ## Dual harness with Claude pilotfish
 
-If Claude pilotfish is already installed, Grok's default Claude compatibility
-may also load `~/.claude/CLAUDE.md` / agents. The installer warns about this.
-
-For a **Grok-primary agent roster** after install, you can set:
+Grok discovers Claude Code settings by default. That compatibility is broader
+than `CLAUDE.md`: skills, named agents, MCPs, hooks, session scanners, and
+Claude plugins are separate inputs. pilotfish-grok therefore installs a pure
+Grok isolation profile in `~/.grok/config.toml`:
 
 ```toml
-# ~/.grok/config.toml
+[subagents.toggle]
+"Explore" = false   # exact Claude agent name; lowercase built-in explore stays on
+
 [compat.claude]
-agents = false   # disable Claude named instruction agents for Grok
+skills = false
+rules = false
+agents = false
+mcps = false
+hooks = false
+sessions = false
+
+[plugins]
+disabled = ["<every Claude plugin name reported by grok inspect>"]
 ```
 
 Notes:
 
 - This does not uninstall Claude pilotfish; Claude Code keeps using `~/.claude/`.
-- Grok may still surface some `~/.claude/agents/*` files depending on version;
-  same-name roles from `~/.grok/agents/` win for pilotfish-grok names.
-- Skills and other Claude compat cells remain independently configurable.
+- `[compat.claude] agents = false` does not block custom files under
+  `~/.claude/agents/` on the tested Grok 0.2.106 build. The installer adds a
+  false `[subagents.toggle]` entry for every discovered Claude agent name.
+- Claude plugin discovery is independent of the six compatibility cells. The
+  installer merges every plugin rooted under `~/.claude/` into
+  `[plugins] disabled` while preserving existing entries.
+- `grok inspect` can still list disabled discoveries. The E2E acceptance check
+  is behavioral: persisted sessions must contain no `/.claude/` context marker
+  and no hook execution event.
 
 ## Updating
 
@@ -300,6 +316,9 @@ The instruction-surface comparison and approval-gate ablations are documented in
 - Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.
+- Pure Grok isolation disables Claude-derived inputs only inside Grok. If you
+  intentionally want mixed-harness behavior, restore those config keys from
+  the installer backup and do not treat the isolated E2E as representative.
 - Live e2e needs credentials and is not free; default CI stays on static tests.
 
 ## Uninstall

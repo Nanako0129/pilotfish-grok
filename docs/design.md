@@ -18,7 +18,7 @@ are replaced with Grok surfaces.
 
 | Layer | Grok surface | Owns |
 |---|---|---|
-| Machine | `~/.grok/config.toml` | Subagent enablement; optional `[subagents.models]` pins; never forces main-session model by default |
+| Machine | `~/.grok/config.toml` | Subagent enablement; Claude compatibility isolation; optional `[subagents.models]` pins; never forces main-session model by default |
 | Roles | `~/.grok/agents/*.md` + `~/.grok/roles/*.toml` | Role contract, capability mode, reasoning effort, optional model |
 | Policy | `~/.grok/rules/pilotfish-grok.md` | Phase gates, delegation boundaries, approval, integration, verification |
 
@@ -51,6 +51,18 @@ to shadow Claude Code's built-in Explore agent so expensive main-session models
 do not silently run exploration. Grok already has a separate built-in `explore`
 type; `scout` covers pilotfish-grok discovery. Installing a second discovery
 agent would duplicate boundaries without the Claude-specific benefit.
+
+Grok 0.2.106 still discovers `~/.claude/agents/Explore.md` as an uppercase
+custom subagent even when `[compat.claude] agents = false`. The machine layer
+therefore sets the exact case-sensitive `[subagents.toggle] "Explore" = false`;
+lowercase built-in `explore` remains available. Any additional Claude agent
+found by installer preflight receives its own false toggle.
+
+The other Claude imports also have two control planes. All six
+`[compat.claude]` cells are false, while every plugin rooted under
+`~/.claude/` is separately added to `[plugins] disabled`. This keeps
+Claude Code itself unchanged while preventing its skills, instructions, hooks,
+MCPs, agents, and plugins from affecting Grok policy experiments.
 
 ### Why verifier uses `execute`, not `read-only`
 
@@ -111,7 +123,7 @@ chain.
 | General unprompted role-routing eval | `ambient-native-plan` covers the mandatory Plan lifecycle; free-form role choice outside that gate remains out of scope |
 | Enforcement hooks | Policy-first, matching Pilotfish philosophy |
 | Per-project install | Global `~/.grok/` is the product surface |
-| Editing `~/.claude/` | Dual-harness coexistence; Claude pilotfish remains independent |
+| Editing `~/.claude/` | Isolation is Grok-owned config only; Claude pilotfish remains independent |
 
 ## Relationship to siblings
 

@@ -99,6 +99,18 @@ class TemplateContractTests(unittest.TestCase):
     def test_config_keeps_main_model_user_controlled(self) -> None:
         config = load_toml(ROOT / "templates" / "config.snippet.toml")
         self.assertTrue(config["subagents"]["enabled"])
+        self.assertFalse(config["subagents"]["toggle"]["Explore"])
+        self.assertEqual(
+            config["compat"]["claude"],
+            {
+                "skills": False,
+                "rules": False,
+                "agents": False,
+                "mcps": False,
+                "hooks": False,
+                "sessions": False,
+            },
+        )
         self.assertNotIn("default", config.get("models", {}))
         self.assertNotIn("default_reasoning_effort", config.get("models", {}))
         # No forced model pins in the live snippet tables
@@ -146,6 +158,9 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("config.toml.pilotfish-grok-*", installer)
         self.assertIn("Do not write anything until the user explicitly approves", installer)
         self.assertIn("Never modify `~/.claude/`", installer)
+        self.assertIn("[subagents.toggle]", installer)
+        self.assertIn("[plugins] disabled", installer)
+        self.assertIn("all six `[compat.claude]`", installer)
         self.assertIn("Uninstall", installer)
 
         for role in ROUTING:

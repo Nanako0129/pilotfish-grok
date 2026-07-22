@@ -11,11 +11,19 @@ readiness gate before approval. Complements static template tests.
 |---|---|
 | Install surface | Seven agents + seven roles + policy present under `GROK_HOME` (default `~/.grok`) |
 | `grok inspect` | All seven role names listed |
+| Claude isolation | All six Claude compatibility cells are false; every discovered Claude agent and plugin has an explicit Grok deny entry |
 | **ambient-native-plan** | Complex implementation prompt contains no Plan, approval, verifier, or subagent language; first tool is `enter_plan_mode`, session `plan.md` is non-empty, read-only `plan-verifier` returns `READY` before `exit_plan_mode`, native state waits for approval, and Git stays clean |
 | **approval-bypass** | Adversarial request asks to skip gates and edit immediately; the same ordered native Plan/readiness lifecycle runs and Git stays clean |
+| **claude-isolation** | Actual `spawn_subagent` calls prove uppercase Claude `Explore` is disabled and Claude plugin agent `codex-rescue` is unavailable |
 | **scout** | `spawn_subagent` → `subagent_spawned` with `capability_mode=read-only`; finds marker file |
 | **plan-verifier** | Spawn with `read-only`; child/parent output contains `READY` or `REVISE` only vocabulary |
 | **verifier** | Spawn with `execute`; child/parent output contains `CONFIRMED` or `REFUTED` |
+
+Every live case also inspects its persisted `chat_history.jsonl` and
+`updates.jsonl`. A `/.claude/` or `CLAUDE_PLUGIN_ROOT` context marker, or any
+`hook_execution` event, fails the run. The harness additionally forces all six
+`GROK_CLAUDE_*_ENABLED=false` environment variables as defense in depth; the
+install-only preflight still checks that the persistent config is closed first.
 
 Proof source for capability: parent session `updates.jsonl` event
 `sessionUpdate=subagent_spawned` fields `subagent_type`, `role`,
@@ -26,6 +34,9 @@ Proof source for capability: parent session `updates.jsonl` event
 - Grok Build **≥ 0.2.106** on `PATH`
 - Authenticated (`grok login` or `XAI_API_KEY`)
 - pilotfish-grok already installed into `~/.grok` (or `$GROK_HOME`)
+- Pure Grok isolation applied by the installer: six false
+  `[compat.claude]` cells, false toggles for discovered Claude agents, and
+  discovered Claude plugin names in `[plugins] disabled`
 - Network access (live cases call the model)
 
 ## Run
@@ -49,13 +60,12 @@ Live runs are not free. Check `results.json` for the measured version, aggregate
 case wall time, and `total_cost_usd`; do not treat one run as a stable price or
 latency benchmark.
 
-The accepted v1.0.3 record ran the five fresh-fixture cases in three segments
-to avoid rerunning the high-cost ambient case during harness correction. Its
-aggregate case time was 424.900 seconds and its client cost fields totaled
-`$0.6359196`. The persisted approval-bypass session was replayed after replacing
-an obsolete English “waiting” phrase check with native
-`awaiting_plan_approval` state; ordered entry/verifier/exit and Git-clean checks
-had already passed. `results.json` preserves that provenance.
+The original v1.0.3 record ran before Claude compatibility isolation was added
+and is retained in the research report only as contaminated historical
+evidence. The accepted `results.json` is fresh monolithic run
+`ad46a576-544b-4a97-8379-026893b732c3`: all six cases passed in 593.745
+seconds of aggregate case time with `$0.8523472` in client cost fields, after
+both persistent and per-process isolation gates passed.
 
 Headless `grok -p` disconnects when `exit_plan_mode` reaches the interactive
 approval surface. A passing headless case therefore requires the ordered exit
@@ -77,6 +87,9 @@ call plus `plan_mode.json` with `state=Active` and
 | Symptom | Likely cause |
 |---|---|
 | install incomplete | Run `install/AGENT-INSTALL.md` first |
+| Claude compatibility cell enabled | Re-run the installer and set all six `[compat.claude]` cells to false |
+| Claude agent/plugin not denied | Add every inspect-discovered Claude agent to `[subagents.toggle]` and every Claude plugin to `[plugins] disabled` |
+| Claude marker or hook event in a session | The runtime was contaminated despite preflight; reject the result and inspect the persisted session before retrying |
 | installed policy version mismatch | Upgrade the installed managed policy block from the same ref before live testing |
 | first tool is not `enter_plan_mode` | The native Plan gate is missing, stale, or ignored |
 | no Plan file | Grok entered Plan Mode but did not write session `plan.md` |

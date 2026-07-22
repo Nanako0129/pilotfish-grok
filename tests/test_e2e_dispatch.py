@@ -39,6 +39,7 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertIn("capability_mode", text)
         self.assertIn("ambient-native-plan", text)
         self.assertIn("approval-bypass", text)
+        self.assertIn("claude-isolation", text)
         self.assertIn("enter_plan_mode", text)
         self.assertIn("exit_plan_mode", text)
         self.assertIn("plan.md", text)
@@ -46,7 +47,82 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertIn("max_turns=28", text)
         self.assertIn("timeout_seconds=600", text)
         self.assertIn("git status", text)
+        self.assertIn("assert_claude_isolation_config", text)
+        self.assertIn("assert_session_claude_isolated", text)
+        self.assertIn("GROK_CLAUDE_SKILLS_ENABLED", text)
         self.assertIn("--skip-live", text)
+
+    def test_session_isolation_rejects_claude_context_and_hooks(self) -> None:
+        runner = load_runner_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            session = Path(tmp)
+            (session / "chat_history.jsonl").write_text(
+                json.dumps(
+                    {
+                        "type": "user",
+                        "content": "/Users/nanako/.claude/skills/example/SKILL.md",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            (session / "updates.jsonl").write_text("", encoding="utf-8")
+            with self.assertRaisesRegex(AssertionError, "Claude compatibility leaked"):
+                runner.assert_session_claude_isolated(session)
+
+            (session / "chat_history.jsonl").write_text("{}\n", encoding="utf-8")
+            (session / "updates.jsonl").write_text(
+                json.dumps(
+                    {
+                        "params": {
+                            "update": {"sessionUpdate": "hook_execution"}
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "executed 1 startup/runtime hooks"):
+                runner.assert_session_claude_isolated(session)
+
+    def test_tool_failure_links_to_original_spawn_call(self) -> None:
+        runner = load_runner_module()
+        updates = [
+            {
+                "params": {
+                    "update": {
+                        "sessionUpdate": "tool_call",
+                        "toolCallId": "call-1",
+                        "title": "spawn_subagent",
+                        "rawInput": {"subagent_type": "Explore"},
+                        "_meta": {"x.ai/tool": {"name": "spawn_subagent"}},
+                    }
+                }
+            },
+            {
+                "params": {
+                    "update": {
+                        "sessionUpdate": "tool_call_update",
+                        "toolCallId": "call-1",
+                        "status": "failed",
+                        "rawOutput": {"message": "Subagent Explore is disabled"},
+                    }
+                }
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            session = Path(tmp)
+            (session / "updates.jsonl").write_text(
+                "".join(json.dumps(item) + "\n" for item in updates),
+                encoding="utf-8",
+            )
+            failures = [
+                event
+                for event in runner.parse_session_events(session)
+                if event["kind"] == "tool_failure"
+            ]
+        self.assertEqual(failures[0]["tool"], "spawn_subagent")
+        self.assertEqual(failures[0]["raw_input"]["subagent_type"], "Explore")
 
     def test_ordered_native_plan_gate_parser(self) -> None:
         runner = load_runner_module()
@@ -76,7 +152,7 @@ class E2EDispatchTests(unittest.TestCase):
                         "sessionUpdate": "subagent_finished",
                         "subagent_id": "pv-1",
                         "status": "completed",
-                        "output": "REVISE\nClarify ownership.",
+                        "output": "VERDICT: **REVISE**\nClarify ownership.",
                     }
                 }
             },
@@ -138,14 +214,16 @@ class E2EDispatchTests(unittest.TestCase):
 
     def test_recorded_result_covers_native_plan_and_bypass(self) -> None:
         payload = json.loads(RESULTS.read_text(encoding="utf-8"))
-        self.assertEqual(payload["schema"], "pilotfish-grok.e2e-dispatch.v3")
+        self.assertEqual(payload["schema"], "pilotfish-grok.e2e-dispatch.v4")
         self.assertTrue(payload["ok"])
+        self.assertEqual(payload["claude_isolation"]["active_claude_entries"], 0)
         cases = {case["case"]: case for case in payload["cases"]}
         self.assertEqual(
             set(cases),
             {
                 "ambient-native-plan",
                 "approval-bypass",
+                "claude-isolation",
                 "scout",
                 "plan-verifier",
                 "verifier",
@@ -159,6 +237,13 @@ class E2EDispatchTests(unittest.TestCase):
             self.assertTrue(gate["ready_before_exit"])
             self.assertTrue(gate["awaiting_native_approval"])
             self.assertEqual(gate["write_capable_spawns"], [])
+        isolation_gate = cases["claude-isolation"]["gate"]
+        self.assertTrue(isolation_gate["explore_denied"])
+        self.assertTrue(isolation_gate["claude_plugin_agent_denied"])
+        self.assertEqual(isolation_gate["foreign_spawns"], [])
+        for case in cases.values():
+            self.assertEqual(case["session_isolation"]["claude_context_markers"], [])
+            self.assertEqual(case["session_isolation"]["hook_execution_events"], 0)
 
     def test_install_only_probe_when_available(self) -> None:
         if os.environ.get("PILOTFISH_GROK_E2E_SKIP_INSTALL") == "1":
@@ -211,6 +296,8 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertIn('"ready_before_exit": true', results)
         self.assertIn('"awaiting_native_approval": true', results)
         self.assertIn('"git_clean": true', results)
+        self.assertIn('"active_claude_entries": 0', results)
+        self.assertIn('"hook_execution_events": 0', results)
 
 
 if __name__ == "__main__":

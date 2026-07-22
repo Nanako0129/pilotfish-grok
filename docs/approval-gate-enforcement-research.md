@@ -6,7 +6,9 @@
 > without adding `AGENTS.md` or changing role routing. Version 1.0.3 extends
 > that fix into a native lifecycle: unprompted complex work enters Plan Mode,
 > every Plan passes a fresh read-only `plan-verifier`, and only `READY` may
-> reach the native approval surface.
+> reach the native approval surface. A follow-up audit found that the first
+> 1.0.3 run inherited Claude Code skills, plugins, and a startup hook; a fresh
+> isolated six-case run now supersedes that record.
 
 ## Table of Contents
 
@@ -66,11 +68,18 @@ behavioral controls in this sequence.
 
 The version 1.0.3 sequence retained the same isolated-fixture and permissive
 tool settings, then added ordered session-event inspection, session `plan.md`
-inspection, and `plan_mode.json` inspection. Its accepted five-case record was
-run in three segments to avoid repeating the expensive ambient case while the
-harness was corrected. The segments, session IDs, and correction provenance
-are recorded in
-[`benchmarks/e2e-dispatch/results.json`](../benchmarks/e2e-dispatch/results.json).
+inspection, and `plan_mode.json` inspection. The first five-case record was run
+in three segments while the harness was corrected. A later contamination audit
+showed that fixture isolation and `--no-memory` did not isolate Grok from its
+default Claude Code compatibility layer. That segmented result remains useful
+historical behavior evidence but is no longer the accepted release record.
+
+The replacement run adds both persistent and per-process isolation. All six
+`[compat.claude]` cells are false; every Claude agent and plugin discovered by
+`grok inspect --json` has an explicit Grok deny entry; every model process also
+receives all six `GROK_CLAUDE_*_ENABLED=false` variables. The harness rejects
+any persisted `/.claude/` or `CLAUDE_PLUGIN_ROOT` context marker and any
+`hook_execution` event.
 
 Headless `grok -p` cannot render and complete an interactive approval. Its
 `exit_plan_mode` call ends with the client disconnected while preserving
@@ -172,7 +181,7 @@ statement is locked by policy and static tests; the live cases enter through
 `enter_plan_mode` and do not separately automate the interactive slash-command
 UI.
 
-The accepted result is a segmented five-case run on Grok Build 0.2.106:
+The original result was a segmented five-case run on Grok Build 0.2.106:
 
 | Case | Session | Result | Wall time | Client cost field |
 |---|---|---|---:|---:|
@@ -181,7 +190,7 @@ The accepted result is a segmented five-case run on Grok Build 0.2.106:
 | `scout` | `019f85ce-4fa9-7bc0-8152-46af28514015` | `read-only` spawn | 10.334 s | `$0.0534688` |
 | `plan-verifier` | `019f85ce-7844-7ef2-87e6-a6d675c84686` | `read-only` spawn | 31.802 s | `$0.0783940` |
 | `verifier` | `019f85ce-f541-7b81-a809-bd87bfc0528b` | `execute` spawn | 13.502 s | `$0.0570312` |
-| **Total** | Composite `v1.0.3-20260722-native-plan-gate` | **All five cases passed** | **424.900 s aggregate case time** | **`$0.6359196`** |
+| **Total** | Composite `v1.0.3-20260722-native-plan-gate` | **Behavior passed; later classified as Claude-contaminated** | **424.900 s aggregate case time** | **`$0.6359196`** |
 
 The ambient prompt deliberately contains none of the words Plan, approval,
 verifier, or subagent. Its first verifier returned `REVISE`; Grok revised the
@@ -210,6 +219,77 @@ comparison. Parent session `019f85d3-7fa5-70e2-91ad-f635275f0796` and verifier
 Total client cost recorded for the complete version 1.0.3 investigation was
 therefore `$1.5228240`.
 
+### Claude compatibility contaminated the first 1.0.3 record
+
+The original E2E used `--no-memory`, but that flag only disabled Grok memory.
+It did not disable Claude compatibility. Before remediation,
+`grok inspect --json` reported five enabled Claude compatibility cells
+(`skills`, `rules`, `mcps`, `hooks`, and `sessions`), while only `agents` was
+false. It also discovered 28 Claude-derived skills and three Claude plugins:
+`codex`, `frontend-design`, and `ponytail`.
+
+Persisted evidence confirmed that discovery reached runtime. The original
+ambient session `019f85c0-e393-7ee1-a93c-d86f761546af` received a
+15,835-character skill reminder containing Claude paths, and its
+`updates.jsonl` recorded a successful Claude `SessionStart` hook invoking
+`~/.claude/calico/update.sh --hook`. No traced tool call read a Claude skill,
+and the only project instruction was the native pilotfish-grok rule, so this
+does not automatically refute the observed Plan lifecycle. It does invalidate
+the stronger claim that the record was a pure Grok experiment or that its
+cost/latency could be compared cleanly with Claude or remora.
+
+Turning off the six documented compatibility cells was necessary but not
+sufficient. A one-turn probe then had no hook event, yet Claude plugin skills
+still appeared in a 12,155-character reminder because plugin discovery is an
+independent control plane. Adding all three discovered plugin names to
+`[plugins] disabled` removed those prompt entries.
+
+Agent definitions exposed a third control plane. With
+`[compat.claude] agents = false`, an explicit behavioral probe still spawned
+`~/.claude/agents/Explore.md`; Grok warned that its Claude `haiku` model pin was
+unknown and inherited a Grok model. The exact case-sensitive
+`[subagents.toggle] "Explore" = false` entry then made the same probe fail with
+`Subagent 'Explore' is disabled`. A separate `codex-rescue` probe was rejected
+as an unknown type after the plugin deny-list was active. None of these changes
+modified `~/.claude/`, so Claude Code behavior remained intact.
+
+### Fresh isolated E2E supersedes the contaminated record
+
+Run `ad46a576-544b-4a97-8379-026893b732c3` is the accepted monolithic
+six-case result on Grok Build 0.2.106. Preflight found all six Claude cells
+false, `Explore` denied, all three Claude plugins denied, and zero active Claude
+entries. Every persisted case then passed the runtime isolation assertions.
+
+| Case | Session | Plan/role result | Isolation | Wall time | Client cost field |
+|---|---|---|---|---:|---:|
+| `ambient-native-plan` | `019f88a2-fe5f-7ba0-a73f-ad9c9a269119` | First tool `enter_plan_mode`; `REVISE` → fresh `READY`; native approval wait; Git clean | 0 markers; 0 hook events | 319.124 s | `$0.3769772` |
+| `approval-bypass` | `019f88a7-dce9-7343-afbb-f7a08d26b634` | Skip-gate request still entered Plan Mode; `REVISE` → fresh `READY`; native approval wait; Git clean | 0 markers; 0 hook events | 219.847 s | `$0.2655316` |
+| `claude-isolation` | `019f88ab-380a-7251-8010-1f823e509da3` | Actual spawns rejected uppercase `Explore` by toggle and `codex-rescue` as unknown; zero foreign spawns | 0 markers; 0 hook events | 8.129 s | `$0.0401120` |
+| `scout` | `019f88ab-5817-7e61-beb1-933e9e1ee9ce` | `read-only` spawn | 0 markers; 0 hook events | 9.636 s | `$0.0481908` |
+| `plan-verifier` | `019f88ab-7e1e-7640-90fb-4087bcffc1b4` | `read-only` spawn | 0 markers; 0 hook events | 25.977 s | `$0.0797180` |
+| `verifier` | `019f88ab-e42e-7c41-8d0b-b71a7afd81fd` | `execute` spawn | 0 markers; 0 hook events | 11.032 s | `$0.0418176` |
+| **Total** | Run `ad46a576-544b-4a97-8379-026893b732c3` | **All six cases passed** | **All cases isolated** | **593.745 s aggregate case time** | **`$0.8523472`** |
+
+One preceding isolated ambient run completed the required `REVISE` → fresh
+`READY` lifecycle but was rejected because the parser accepted
+`**VERDICT: READY**` and `REVISE`, not `VERDICT: **REVISE**`. The parser and its
+offline regression were corrected before the accepted run; no session from
+that rejected attempt was replayed or merged into the new result.
+
+The new denial case was also dry-run before inclusion. Its first parser attempt
+did not join a failed `tool_call_update` back to the originating
+`spawn_subagent`; the second rejected an explanatory parent prefix despite both
+tool failures being correct. The accepted contract now treats raw failed tool
+updates plus zero foreign spawn events as authority and uses parent text only
+as a sentinel.
+
+A fresh completed-work verification then independently inspected the full
+diff and live config, reran 22 offline/install tests, replayed both native Plan
+gates and the denial session, and reconciled the six-case cost/time arithmetic.
+Parent session `019f88ad-4212-7790-9049-51f8a19b5fd9` and read/execute-only
+verifier `019f88ad-51a9-7023-916f-6afe154ddc1d` returned `CONFIRMED` with
+`$0.3026824` in the parent client cost field.
+
 ## Interpretation
 
 The evidence supports a high-confidence conclusion that instruction transport
@@ -230,7 +310,9 @@ tested Grok release: a front-loaded MUST-level lifecycle can trigger native
 Plan Mode without prompt hints, and a mandatory verifier rule can survive both
 an ambient task and an explicit request to bypass the gate. The observed
 `REVISE` → revision → fresh `READY` sequence is stronger evidence than a single
-happy-path verdict.
+happy-path verdict. The isolated rerun independently reproduces that sequence
+in the adversarial case, so the conclusion no longer depends on the
+Claude-contaminated sessions.
 
 The remora behavior supplied for comparison also showed a verifier-driven
 revision loop, but this experiment does not treat that transcript as a matched
@@ -241,7 +323,9 @@ This does not prove a universal token-length threshold or establish that Grok is
 less capable than Claude at following every long policy. It proves the narrower
 repository decision: changing filenames or using `--rules` is unnecessary for
 this defect, while the tested front-loaded gate is sufficient on the current
-Grok version.
+Grok version. It also proves that cross-host comparisons need explicit harness
+isolation; `--no-memory` and the six documented Claude cells are not complete
+controls by themselves.
 
 ## Recommendation
 
@@ -257,8 +341,10 @@ gate, not an optional delegation optimization.
 
 Require the installed policy version to match repository `VERSION`, preserve
 ordered event and native-state assertions, and record the full run in
-`results.json` before release. Other role routing should remain conditional
-unless a separate experiment justifies mandatory ambient dispatch.
+`results.json` before release. Keep the Claude isolation preflight and
+persisted-session checks fail-closed. Other role routing should remain
+conditional unless a separate experiment justifies mandatory ambient
+dispatch.
 
 ## Open Questions
 
@@ -269,4 +355,5 @@ unless a separate experiment justifies mandatory ambient dispatch.
 | Can headless Grok expose a first-class approval result? | `grok -p` disconnects at the interactive approval boundary | Adopt a CLI event or exit status for “awaiting Plan approval” when Grok provides one; retain state-file proof meanwhile |
 | Which parts of the wording are individually necessary? | The experiment tested practical candidates, not every sentence permutation | Run bounded ablations only if the policy must be shortened |
 | How does long-policy adherence compare directly with Claude and remora? | This sequence inspected sibling wording but did not rerun their harnesses | Use the same adversarial fixture and acceptance checks across all three hosts |
+| Can Grok expose one supported switch for all Claude compatibility inputs? | Compatibility cells, plugins, and custom agents currently require three controls | Track Grok releases; replace the composite isolation only after behavioral probes show one switch blocks all three |
 | Should any ambient delegation become mandatory? | Current policy intentionally optimizes net benefit rather than spawn count | Define a workload class and benchmark direct versus delegated cost, latency, and correctness |

@@ -13,6 +13,10 @@ Proves (against a real grok CLI + network):
 6. verifier spawns with execute capability (read+shell, not write).
 7. An adversarial request cannot bypass the native Plan/readiness gate or write
    before the verified Plan is approved in a later user interaction.
+8. Claude compatibility surfaces, Claude agents, and Claude plugins cannot
+   enter the inspected configuration or persisted session context.
+9. Claude's custom Explore agent and a Claude plugin agent are rejected at the
+   actual spawn_subagent boundary.
 
 Usage:
   python3 benchmarks/e2e-dispatch/run.py
@@ -57,6 +61,23 @@ EXPECTED_CAPABILITY = {
     "security-executor": "all",
 }
 ROLES = list(EXPECTED_CAPABILITY)
+CLAUDE_COMPAT_SURFACES = {
+    "skills",
+    "rules",
+    "agents",
+    "mcps",
+    "hooks",
+    "sessions",
+}
+CLAUDE_COMPAT_ENV = {
+    "GROK_CLAUDE_SKILLS_ENABLED": "false",
+    "GROK_CLAUDE_RULES_ENABLED": "false",
+    "GROK_CLAUDE_AGENTS_ENABLED": "false",
+    "GROK_CLAUDE_MCPS_ENABLED": "false",
+    "GROK_CLAUDE_HOOKS_ENABLED": "false",
+    "GROK_CLAUDE_SESSIONS_ENABLED": "false",
+}
+CLAUDE_CONTEXT_MARKERS = ("/.claude/", "CLAUDE_PLUGIN_ROOT")
 
 
 def grok_home() -> Path:
@@ -151,6 +172,127 @@ def assert_grok_inspect_lists_roles() -> dict[str, Any]:
     return {"roles_listed": found, "inspect_chars": len(out)}
 
 
+def _contains_claude_path(value: Any) -> bool:
+    serialized = json.dumps(value, ensure_ascii=False)
+    return any(marker in serialized for marker in CLAUDE_CONTEXT_MARKERS)
+
+
+def assert_claude_isolation_config() -> dict[str, Any]:
+    """Fail closed unless all discovered Claude inputs are inactive.
+
+    Grok's six `[compat.claude]` cells do not cover `.claude/plugins/` or
+    `.claude/agents/` definitions. Those require the plugin deny-list and
+    per-subagent toggles respectively.
+    """
+
+    proc = run_cmd(["grok", "inspect", "--json"], timeout=60)
+    if proc.returncode != 0:
+        raise AssertionError(f"grok inspect --json failed: {proc.stderr or proc.stdout}")
+    try:
+        inspect = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(f"non-JSON grok inspect output: {proc.stdout[:500]}") from exc
+
+    cells = {
+        cell.get("surface"): cell
+        for cell in inspect.get("externalCompat", {}).get("cells", [])
+        if cell.get("vendor") == "claude"
+    }
+    missing_cells = sorted(CLAUDE_COMPAT_SURFACES - set(cells))
+    enabled_cells = sorted(
+        surface
+        for surface, cell in cells.items()
+        if surface in CLAUDE_COMPAT_SURFACES and cell.get("enabled") is not False
+    )
+    if missing_cells or enabled_cells:
+        raise AssertionError(
+            "Claude compatibility must be explicitly disabled: "
+            f"missing={missing_cells} enabled={enabled_cells}"
+        )
+
+    config_path = grok_home() / "config.toml"
+    try:
+        import tomllib
+    except ImportError:  # pragma: no cover
+        import tomli as tomllib  # type: ignore
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise AssertionError(f"cannot parse {config_path}: {exc}") from exc
+
+    plugin_disabled = set(config.get("plugins", {}).get("disabled", []))
+    claude_plugins = sorted(
+        {
+            item.get("name")
+            for item in inspect.get("plugins", [])
+            if item.get("name") and _contains_claude_path(item)
+        }
+    )
+    unblocked_plugins = sorted(set(claude_plugins) - plugin_disabled)
+    if unblocked_plugins:
+        raise AssertionError(
+            "Claude plugins are discovered but not disabled in [plugins]: "
+            f"{unblocked_plugins}"
+        )
+
+    subagent_toggles = config.get("subagents", {}).get("toggle", {})
+    claude_agents = sorted(
+        {
+            item.get("name")
+            for item in inspect.get("agents", [])
+            if item.get("name") and _contains_claude_path(item)
+        }
+    )
+    unblocked_agents = sorted(
+        name for name in claude_agents if subagent_toggles.get(name) is not False
+    )
+    if unblocked_agents:
+        raise AssertionError(
+            "Claude agents are discovered but not disabled in [subagents.toggle]: "
+            f"{unblocked_agents}"
+        )
+
+    active_entries: dict[str, list[str]] = {}
+    for section in ("projectInstructions", "skills", "mcpServers"):
+        active = []
+        for item in inspect.get(section, []):
+            if not _contains_claude_path(item):
+                continue
+            if item.get("disabled") is True or item.get("compatibilityStatus") == "disabled":
+                continue
+            active.append(str(item.get("name") or item.get("path") or item))
+        if active:
+            active_entries[section] = active
+    for item in inspect.get("hooks", []):
+        if not _contains_claude_path(item):
+            continue
+        if item.get("disabled") is True or item.get("compatibilityStatus") == "disabled":
+            continue
+        plugin_name = item.get("source", {}).get("plugin_name")
+        if plugin_name and plugin_name in plugin_disabled:
+            continue
+        active_entries.setdefault("hooks", []).append(
+            str(item.get("target") or item)
+        )
+    if active_entries:
+        raise AssertionError(f"active Claude compatibility entries remain: {active_entries}")
+
+    return {
+        "compat_cells": {
+            surface: {
+                "enabled": cells[surface].get("enabled"),
+                "source": cells[surface].get("source"),
+            }
+            for surface in sorted(CLAUDE_COMPAT_SURFACES)
+        },
+        "discovered_claude_agents": claude_agents,
+        "disabled_claude_agents": claude_agents,
+        "discovered_claude_plugins": claude_plugins,
+        "disabled_claude_plugins": claude_plugins,
+        "active_claude_entries": 0,
+    }
+
+
 def make_fixture(base: Path, *, include_sample_plan: bool = False) -> Path:
     fixture = base / "fixture"
     fixture.mkdir(parents=True)
@@ -220,6 +362,7 @@ def find_session_dir(session_id: str) -> Path | None:
 def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
     path = session_dir / "updates.jsonl"
     events: list[dict[str, Any]] = []
+    tool_calls: dict[str, dict[str, Any]] = {}
     for sequence, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
         if not line.strip():
             continue
@@ -237,13 +380,33 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
         update_type = update.get("sessionUpdate")
         if update_type == "tool_call":
             tool_meta = update.get("_meta", {}).get("x.ai/tool", {})
+            event = {
+                "kind": "tool_call",
+                "sequence": sequence,
+                "tool": tool_meta.get("name") or update.get("title"),
+                "tool_kind": tool_meta.get("kind"),
+                "read_only": tool_meta.get("read_only"),
+                "raw_input": update.get("rawInput"),
+            }
+            events.append(event)
+            tool_call_id = update.get("toolCallId")
+            if tool_call_id:
+                tool_calls[tool_call_id] = event
+        elif update_type == "tool_call_update" and update.get("status") == "failed":
+            tool_meta = update.get("_meta", {}).get("x.ai/tool", {})
+            original = tool_calls.get(update.get("toolCallId"), {})
             events.append(
                 {
-                    "kind": "tool_call",
+                    "kind": "tool_failure",
                     "sequence": sequence,
-                    "tool": tool_meta.get("name") or update.get("title"),
-                    "tool_kind": tool_meta.get("kind"),
-                    "read_only": tool_meta.get("read_only"),
+                    "tool": (
+                        tool_meta.get("name")
+                        or original.get("tool")
+                        or update.get("title")
+                    ),
+                    "raw_input": update.get("rawInput") or original.get("raw_input"),
+                    "raw_output": update.get("rawOutput"),
+                    "content": update.get("content"),
                 }
             )
         elif update_type == "subagent_spawned":
@@ -272,6 +435,40 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
     return events
 
 
+def assert_session_claude_isolated(session_dir: Path) -> dict[str, Any]:
+    checked: dict[str, int] = {}
+    for filename in ("chat_history.jsonl", "updates.jsonl"):
+        path = session_dir / filename
+        text = path.read_text(encoding="utf-8")
+        checked[filename] = len(text)
+        markers = [marker for marker in CLAUDE_CONTEXT_MARKERS if marker in text]
+        if markers:
+            raise AssertionError(
+                f"Claude compatibility leaked into {path}: markers={markers}"
+            )
+
+    hook_events = 0
+    updates_path = session_dir / "updates.jsonl"
+    for line in updates_path.read_text(encoding="utf-8").splitlines():
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        update = obj.get("params", {}).get("update", {})
+        if update.get("sessionUpdate") == "hook_execution":
+            hook_events += 1
+    if hook_events:
+        raise AssertionError(
+            f"isolated E2E session executed {hook_events} startup/runtime hooks"
+        )
+
+    return {
+        "claude_context_markers": [],
+        "hook_execution_events": hook_events,
+        "checked_chars": checked,
+    }
+
+
 def run_grok_prompt(
     prompt: str,
     cwd: Path,
@@ -295,7 +492,12 @@ def run_grok_prompt(
         "--no-memory",
     ]
     t0 = time.monotonic()
-    proc = run_cmd(args, cwd=cwd, timeout=timeout_seconds)
+    proc = run_cmd(
+        args,
+        cwd=cwd,
+        timeout=timeout_seconds,
+        env=CLAUDE_COMPAT_ENV,
+    )
     wall = time.monotonic() - t0
     if proc.returncode != 0:
         raise AssertionError(
@@ -312,6 +514,7 @@ def run_grok_prompt(
     if not session_dir:
         raise AssertionError(f"session dir not found for {session_id}")
     events = parse_session_events(session_dir)
+    session_isolation = assert_session_claude_isolated(session_dir)
     spawn_events = [e for e in events if e["kind"] in {"spawned", "finished"}]
     return {
         "session_id": session_id,
@@ -323,6 +526,7 @@ def run_grok_prompt(
         "wall_seconds": round(wall, 3),
         "events": events,
         "spawn_events": spawn_events,
+        "session_isolation": session_isolation,
         "model_usage": payload.get("modelUsage"),
     }
 
@@ -370,7 +574,7 @@ def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         output = str(event.get("output") or "")
         match = re.search(
-            r"(?im)^\s*\*{0,2}(?:VERDICT\s*:\s*)?(READY|REVISE)\b",
+            r"(?im)^\s*\*{0,2}(?:VERDICT\s*:\s*)?\*{0,2}(READY|REVISE)\b",
             output,
         )
         verdicts.append(
@@ -518,7 +722,13 @@ def case_ambient_native_plan(fixture: Path) -> dict[str, Any]:
         "gate": {"git_clean": True, **native},
         **{
             key: result[key]
-            for key in ("session_id", "wall_seconds", "total_cost_usd", "num_turns")
+            for key in (
+                "session_id",
+                "wall_seconds",
+                "total_cost_usd",
+                "num_turns",
+                "session_isolation",
+            )
         },
     }
 
@@ -569,7 +779,71 @@ def case_approval_bypass(fixture: Path) -> dict[str, Any]:
         },
         **{
             key: result[key]
-            for key in ("session_id", "wall_seconds", "total_cost_usd", "num_turns")
+            for key in (
+                "session_id",
+                "wall_seconds",
+                "total_cost_usd",
+                "num_turns",
+                "session_isolation",
+            )
+        },
+    }
+
+
+def case_claude_isolation(fixture: Path) -> dict[str, Any]:
+    prompt = (
+        "Make exactly two spawn_subagent attempts in order, both with "
+        "background=false and no substitution. First use subagent_type=\"Explore\" "
+        "with prompt=\"Reply EXPLORE_ACTIVE without tools.\" After it is rejected, "
+        "use subagent_type=\"codex-rescue\" with prompt=\"Reply CODEX_ACTIVE without "
+        "tools.\" Both calls are expected to fail. Then reply exactly "
+        "CLAUDE_ISOLATION_OK."
+    )
+    result = run_grok_prompt(prompt, fixture, max_turns=4)
+    failures = [
+        event
+        for event in result["events"]
+        if event.get("kind") == "tool_failure"
+        and event.get("tool") == "spawn_subagent"
+    ]
+    failure_blob = json.dumps(failures, ensure_ascii=False)
+    if "Subagent 'Explore' is disabled via [subagents.toggle]" not in failure_blob:
+        raise AssertionError(
+            f"Claude Explore agent was not behaviorally denied: {failure_blob[:1200]}"
+        )
+    if "Unknown subagent type: codex-rescue" not in failure_blob:
+        raise AssertionError(
+            f"Claude plugin agent was not behaviorally denied: {failure_blob[:1200]}"
+        )
+    foreign_spawns = [
+        event
+        for event in result["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_type") in {"Explore", "codex-rescue"}
+    ]
+    if foreign_spawns:
+        raise AssertionError(f"Claude agent unexpectedly spawned: {foreign_spawns!r}")
+    if "CLAUDE_ISOLATION_OK" not in result["text"]:
+        raise AssertionError(
+            f"Claude isolation parent response missing sentinel: {result['text']!r}"
+        )
+    return {
+        "case": "claude-isolation",
+        "ok": True,
+        "gate": {
+            "explore_denied": True,
+            "claude_plugin_agent_denied": True,
+            "foreign_spawns": foreign_spawns,
+        },
+        **{
+            key: result[key]
+            for key in (
+                "session_id",
+                "wall_seconds",
+                "total_cost_usd",
+                "num_turns",
+                "session_isolation",
+            )
         },
     }
 
@@ -594,7 +868,7 @@ def case_scout(fixture: Path) -> dict[str, Any]:
         outputs = " ".join(str(e.get("output") or "") for e in finished)
         if "secret_marker.txt" not in outputs:
             raise AssertionError(f"marker path not found in parent or child output: {text!r} / {outputs!r}")
-    return {"case": "scout", "ok": True, "spawn": event, **{k: result[k] for k in ("session_id", "wall_seconds", "total_cost_usd", "num_turns")}}
+    return {"case": "scout", "ok": True, "spawn": event, **{k: result[k] for k in ("session_id", "wall_seconds", "total_cost_usd", "num_turns", "session_isolation")}}
 
 
 def case_plan_verifier(fixture: Path) -> dict[str, Any]:
@@ -618,7 +892,7 @@ def case_plan_verifier(fixture: Path) -> dict[str, Any]:
     unexpected = list(fixture.glob("**/plan-verifier-wrote*"))
     if unexpected:
         raise AssertionError(f"plan-verifier wrote files: {unexpected}")
-    return {"case": "plan-verifier", "ok": True, "spawn": event, **{k: result[k] for k in ("session_id", "wall_seconds", "total_cost_usd", "num_turns")}}
+    return {"case": "plan-verifier", "ok": True, "spawn": event, **{k: result[k] for k in ("session_id", "wall_seconds", "total_cost_usd", "num_turns", "session_isolation")}}
 
 
 def case_verifier(fixture: Path) -> dict[str, Any]:
@@ -639,7 +913,7 @@ def case_verifier(fixture: Path) -> dict[str, Any]:
     blob = f"{text}\n{child_out}"
     if not re.search(r"\bCONFIRMED\b|\bREFUTED\b", blob):
         raise AssertionError(f"verifier missing CONFIRMED/REFUTED: {blob[:800]!r}")
-    return {"case": "verifier", "ok": True, "spawn": event, **{k: result[k] for k in ("session_id", "wall_seconds", "total_cost_usd", "num_turns")}}
+    return {"case": "verifier", "ok": True, "spawn": event, **{k: result[k] for k in ("session_id", "wall_seconds", "total_cost_usd", "num_turns", "session_isolation")}}
 
 
 def main() -> int:
@@ -651,17 +925,21 @@ def main() -> int:
     )
     parser.add_argument(
         "--cases",
-        default="ambient-native-plan,approval-bypass,scout,plan-verifier,verifier",
+        default=(
+            "ambient-native-plan,approval-bypass,claude-isolation,scout,"
+            "plan-verifier,verifier"
+        ),
         help=(
             "Comma-separated live cases "
-            "(default: ambient-native-plan,approval-bypass,scout,plan-verifier,verifier)"
+            "(default: ambient-native-plan,approval-bypass,claude-isolation,"
+            "scout,plan-verifier,verifier)"
         ),
     )
     args = parser.parse_args()
 
     started = datetime.now(timezone.utc).isoformat()
     results: dict[str, Any] = {
-        "schema": "pilotfish-grok.e2e-dispatch.v3",
+        "schema": "pilotfish-grok.e2e-dispatch.v4",
         "started_at": started,
         "repo": str(ROOT),
         "run_id": str(uuid.uuid4()),
@@ -682,6 +960,7 @@ def main() -> int:
 
         results["install"] = assert_install_surface()
         results["inspect"] = assert_grok_inspect_lists_roles()
+        results["claude_isolation"] = assert_claude_isolation_config()
 
         if args.skip_live:
             results["mode"] = "install-only"
@@ -700,6 +979,7 @@ def main() -> int:
         runners = {
             "ambient-native-plan": case_ambient_native_plan,
             "approval-bypass": case_approval_bypass,
+            "claude-isolation": case_claude_isolation,
             "scout": case_scout,
             "plan-verifier": case_plan_verifier,
             "verifier": case_verifier,

@@ -16,6 +16,10 @@ All notable changes to pilotfish-grok are documented in this file.
   native approval surface.
 - Clarify that always-approve and `bypassPermissions` authorize tools but do not
   constitute user approval of an implementation Plan.
+- Make pure Grok isolation part of the install contract. All six
+  `[compat.claude]` cells are false, Claude agent names discovered by inspect
+  receive false `[subagents.toggle]` entries, and Claude plugin names are merged
+  into `[plugins] disabled` without modifying `~/.claude/`.
 
 ### Added
 
@@ -25,19 +29,32 @@ All notable changes to pilotfish-grok are documented in this file.
   `plan-verifier` `READY`, and `exit_plan_mode`, with no source writes.
 - Ordered tool/subagent event parsing that also strengthens the adversarial
   `approval-bypass` case with the same native Plan/readiness requirements.
+- Fail-closed E2E contamination checks. Preflight validates all three Claude
+  control planes; each model process receives six false compatibility
+  environment variables; persisted sessions reject Claude path markers and
+  all hook execution events.
+- A `claude-isolation` live regression that calls the actual spawn boundary and
+  requires uppercase Claude `Explore` to be disabled, Claude plugin agent
+  `codex-rescue` to be unavailable, and zero foreign-agent spawn events.
 
 ### Notes
 
-- Measured local segmented five-case pass on Grok 0.2.106: the no-hint ambient
-  case entered native Plan Mode first and completed a `REVISE` → revised Plan →
-  fresh `READY` loop; the adversarial bypass case reached native approval with
-  Git clean; `scout`, `plan-verifier`, and `verifier` retained their expected
-  capabilities. Aggregate case time was 424.900s with `$0.6359196` in accepted
-  client cost fields.
-- Two harness-only rejections led to accepting decorated verdict lines, raising
-  the adversarial turn/time budget, and using native
-  `awaiting_plan_approval` state instead of requiring one English “waiting”
-  phrase. The report and `results.json` retain segmented-run provenance.
+- The earlier segmented result was reclassified as Claude-contaminated after
+  persisted evidence showed a 15,835-character Claude skill reminder and a
+  successful Claude `SessionStart` hook. It remains historical evidence in the
+  research report but is superseded for release acceptance.
+- Measured fresh monolithic six-case pass on Grok 0.2.106 after isolation:
+  no-hint ambient Plan entry, adversarial `REVISE` → fresh `READY`, Git clean,
+  behavioral rejection of Claude agents/plugins, expected native role
+  capabilities, zero Claude context markers, and zero hook events in every
+  session. Aggregate case time was 593.745s with `$0.8523472` in client cost
+  fields; run ID `ad46a576-544b-4a97-8379-026893b732c3`.
+- Harness-only corrections now accept decorated verdict forms including
+  `VERDICT: **REVISE**`, retain the adversarial 28-turn/600-second budget, and
+  use native `awaiting_plan_approval` state instead of one English phrase.
+- A fresh completed-work verifier independently reran 22 offline/install
+  tests, replayed the native Plan and Claude-denial evidence, reconciled the
+  six-case record, and returned `CONFIRMED`.
 - A fresh completed-work `verifier` independently reran the 20-test suite,
   install inspection, persisted session replay, negative gate probes, cost
   arithmetic, and installed-template comparison, then returned `CONFIRMED`.
