@@ -75,11 +75,31 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("Enter native Plan Mode first", lifecycle)
         self.assertIn("Mandatory fresh read-only `plan-verifier`", lifecycle)
         self.assertIn("`READY` unlocks `exit_plan_mode`", lifecycle)
-        self.assertIn("After `READY`, call `exit_plan_mode`", lifecycle)
         self.assertIn(
             "mandatory `plan-verifier` readiness gate is not an optional delegation",
             policy,
         )
+        for phrase in (
+            "program envelope",
+            "next executable slice",
+            "Blocker:",
+            "Evidence:",
+            "Minimum revision:",
+            "Acceptance check:",
+            "two automatic `REVISE` verdicts for the same unit",
+            "pause it and ask the user",
+            "findings and dispositions into the Plan",
+        ):
+            self.assertIn(phrase, policy)
+        for phrase in (
+            "two consecutive `REFUTED` verdicts",
+            "fix the same claim",
+            "stop automatic fix-and-reverify cycling",
+            "the cap is not `CONFIRMED`",
+            "user-directed continuation remains allowed",
+            "substantially unchanged implementation",
+        ):
+            self.assertIn(phrase, " ".join(policy.split()))
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):

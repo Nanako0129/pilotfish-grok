@@ -2,6 +2,17 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.4] — 2026-07-23
+
+Bound Plan review loops with program envelopes and independently approvable
+execution slices. Review the envelope and next executable slice first; unrelated
+downstream slices do not block approval. `READY` is bare, structured `REVISE`
+includes evidence and a closure check, and two automatic revisions for one unit
+pause it for user direction. Security findings enter the Plan before the first
+readiness review for an affected unit. Two consecutive `REFUTED` verdicts for
+one materially revised completed-work claim likewise stop automatic
+fix-and-reverify cycling without becoming `CONFIRMED`.
+
 ## [1.0.3] — 2026-07-22
 
 ### Changed

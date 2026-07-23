@@ -109,6 +109,13 @@ allows `exit_plan_mode` to open the native approval surface. The same readiness
 gate applies when the user entered Plan Mode with `/plan`. Automatic permission
 grants are tool authorization, not approval of the implementation Plan.
 
+Large Plans use one program envelope plus independently approvable execution
+slices. Review the envelope, then only the next executable slice. `READY` is
+bare; structured `REVISE` identifies each blocker and its closure check. Two
+automatic revisions for one unit are the limit before user direction. This
+pauses that unit without treating it as ready or blocking unrelated ready
+slices; shared constraints and prerequisites still gate dependent work.
+
 A single unknown bug should not become a sequential `scout` → `executor`
 pipeline when diagnosis, patch design, and live verification share one evidence
 chain.

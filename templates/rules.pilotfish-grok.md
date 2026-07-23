@@ -1,5 +1,5 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.3 -->
+<!-- pilotfish-grok v1.0.4 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
@@ -16,11 +16,26 @@ Inside Plan Mode, discovery is read-only and the only permitted write is the
 session `plan.md`. The main session must synthesize the complete Plan, then
 spawn a fresh `plan-verifier` with `background: false`, the full Plan text, and
 relevant evidence paths. The child must use its installed read-only capability
-and return only `READY` or `REVISE`. On `REVISE`, the main session owns the
-revision and must send the materially revised Plan to a fresh `plan-verifier`.
+and review exactly one stable readiness unit. `READY` is the bare word and
+nothing else. `REVISE` contains one or more blockers, each with `Blocker:`,
+`Evidence:`, `Minimum revision:`, and `Acceptance check:`. Malformed output is
+a protocol failure, not a Plan judgment.
+
+For long or large work, keep shared outcome, architecture, security,
+dependencies, integration, budget, and stops in one program envelope. Split
+execution only into genuinely independent slices with stable IDs, exclusive
+owners, prerequisites, acceptance, and rollback. Review the envelope first,
+then only the next executable slice. Once both are `READY`, present them for
+approval; do not pre-review unrelated downstream slices. Shared blockers and
+unmet prerequisites still gate dependent work.
+
+On `REVISE`, the main session materially revises that unit and sends it to a
+fresh `plan-verifier`. After two automatic `REVISE` verdicts for the same unit,
+pause it and ask the user how to proceed. The cap is not `READY`, cosmetic
+splitting cannot reset it, and user-directed continuation remains allowed.
 Only a `READY` verdict permits `exit_plan_mode`, which presents the verified
-Plan for user approval. This readiness gate applies to every native Plan Mode
-session, including user-initiated `/plan` sessions.
+envelope and current slice for user approval. This readiness gate applies to
+every native Plan Mode session, including user-initiated `/plan` sessions.
 
 Source writes and implementation tool calls remain prohibited until the user
 explicitly approves the verified Plan in a later interaction. A broad initial
@@ -59,8 +74,8 @@ this lifecycle:
 | Phase | Gate | Eligible delegation |
 |---|---|---|
 | Discovery | Enter native Plan Mode first for gated work, then stabilize the question, allowed scope, evidence format, and stop condition with read-only discovery. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
-| Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, dependencies, exclusive ownership, sequence, verification, budgets, and stop conditions. | Mandatory fresh read-only `plan-verifier`: `REVISE` returns ownership to the main session; `READY` unlocks `exit_plan_mode`. |
-| Approval | After `READY`, call `exit_plan_mode` to present the verified Plan and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
+| Plan | The main session writes one `plan.md` containing a program envelope and independent slices. | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
+| Approval | `READY` unlocks `exit_plan_mode` to present the verified Plan and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
 | Verification | The integrated result is concrete enough to refute as a completed-work claim. | A fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
 
@@ -94,8 +109,10 @@ main session when they share one reasoning chain. Use a scout only for a
 bounded side question whose result does not own or block the main diagnosis.
 
 Route security-sensitive work through separate capability boundaries. Before
-required approval, use `security-reviewer` for evidence only. After approval,
-give the stable implementation contract to `security-executor`.
+the first readiness review for an affected unit, finish `security-reviewer` and
+carry its findings and dispositions into the Plan; do not run the two reviews
+concurrently. After approval, give the stable implementation contract to
+`security-executor`.
 
 ### Routing ownership
 
@@ -127,5 +144,10 @@ re-task the leaf with the captured result.
 Never swap `plan-verifier` and `verifier`. The former challenges Plan readiness
 with `READY` / `REVISE`; the latter reproduces tests and challenges a
 completed-work claim with `CONFIRMED` / `REFUTED`. Neither role writes the Plan
-or fixes findings. Final judgment remains in the main session.
+or fixes findings. After a concrete `REFUTED`, materially fix the same claim
+before using a fresh verifier. After two consecutive `REFUTED` verdicts for
+that claim, stop automatic fix-and-reverify cycling and surface the failures
+and options to the user; the cap is not `CONFIRMED`, and user-directed
+continuation remains allowed. Do not reverify a substantially unchanged
+implementation. Final judgment remains in the main session.
 <!-- pilotfish-grok:end -->
