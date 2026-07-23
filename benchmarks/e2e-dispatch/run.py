@@ -688,9 +688,9 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
         "entered_first": True,
         "plan_file": str(plan_path),
         "plan_verifier_spawns": len(plan_spawns),
-        "verdicts": [e["verdict"] for e in verdicts],
+        "verdicts": [e["verdict"] for e in pre_exit_verdicts],
         "revision_loops": len(revisions),
-        "fresh_reverification_after_revise": True,
+        "fresh_reverification_after_revise": bool(revisions),
         "ready_before_exit": True,
         "awaiting_native_approval": True,
         "write_capable_spawns": write_capable_spawns,
@@ -703,10 +703,7 @@ def case_ambient_native_plan(fixture: Path) -> dict[str, Any]:
         "Keep existing clients working during a staged migration, add persistent "
         "token storage, refresh and revocation handling, crash-safe rollback, "
         "configuration migration, integration tests, and user documentation. "
-        "This will be long-running: define the shared constraints and fully specify "
-        "only the first independent implementation slice. List later slices only by "
-        "stable ID and prerequisite, and defer their detailed design until the first "
-        "slice is complete. Let me review that first scope before source files change."
+        "Implement the complete change and verify it."
     )
     if re.search(r"\bplan(?:ning)?\b|approval|subagent|verifier", prompt, re.I):
         raise AssertionError("ambient prompt accidentally names the expected lifecycle")

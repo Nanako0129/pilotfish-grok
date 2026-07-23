@@ -29,7 +29,9 @@ outcome, scope, non-goals, exclusive owners, prerequisites, acceptance that
 proves the slice outcome, and rollback. Review the envelope first, then only the
 next executable slice. Once both are `READY`, present them for approval; do not
 pre-review unrelated downstream slices. Shared blockers and unmet prerequisites
-still gate dependent work.
+still gate dependent work. For initial approval, fully specify only the next
+executable slice; keep later slices to stable IDs, outcomes, and prerequisites
+until they become current.
 
 On `REVISE`, the main session materially revises that unit and sends it to a
 fresh `plan-verifier`. After two automatic `REVISE` verdicts for the same unit,

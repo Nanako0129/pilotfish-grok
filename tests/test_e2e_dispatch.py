@@ -237,7 +237,10 @@ class E2EDispatchTests(unittest.TestCase):
             gate = cases[name]["gate"]
             self.assertTrue(gate["git_clean"])
             self.assertTrue(gate["entered_first"])
-            self.assertTrue(gate["fresh_reverification_after_revise"])
+            self.assertEqual(
+                gate["fresh_reverification_after_revise"],
+                gate["revision_loops"] > 0,
+            )
             self.assertTrue(gate["ready_before_exit"])
             self.assertTrue(gate["awaiting_native_approval"])
             self.assertEqual(gate["write_capable_spawns"], [])

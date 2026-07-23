@@ -91,6 +91,7 @@ class PolicyTests(unittest.TestCase):
             "outcome, non-goals, scope",
             "proves the slice outcome",
             "next executable slice",
+            "keep later slices to stable IDs",
             "Blocker:",
             "Evidence:",
             "Minimum revision:",
