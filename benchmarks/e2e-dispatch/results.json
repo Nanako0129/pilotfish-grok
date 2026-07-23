@@ -10,9 +10,12 @@
       "gate": {
         "git_clean": true,
         "security_review": {
-          "subagent_id": "019f8fa9-8d6e-7063-ab63-23be496fe8ee",
+          "subagent_ids": [
+            "019f8fa9-8d6e-7063-ab63-23be496fe8ee"
+          ],
           "capability_mode": "read-only",
           "finished_before_readiness": true,
+          "dispositions_presented_to_readiness": true,
           "covered_readiness_unit_ids": [
             "S1",
             "program-envelope"
@@ -61,9 +64,12 @@
         "git_clean": true,
         "mentions_approval": true,
         "security_review": {
-          "subagent_id": "019f8fae-6ea6-7f23-8b3b-4f7e14ba966c",
+          "subagent_ids": [
+            "019f8fae-6ea6-7f23-8b3b-4f7e14ba966c"
+          ],
           "capability_mode": "read-only",
           "finished_before_readiness": true,
+          "dispositions_presented_to_readiness": true,
           "covered_readiness_unit_ids": [
             "env-oauth2-pkce-migration",
             "slice-s1-oauth-pkce-impl"

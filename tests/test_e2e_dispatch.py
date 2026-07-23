@@ -383,21 +383,55 @@ class E2EDispatchTests(unittest.TestCase):
                         "## Target readiness unit\n"
                         "- ID: ENV-test\n"
                         "- Kind: program envelope\n"
+                        "Security dispositions were folded into the Plan.\n"
+                    )
+                },
+            },
+            {
+                "kind": "spawned",
+                "sequence": 4,
+                "subagent_type": "security-reviewer",
+                "capability_mode": "read-only",
+                "subagent_id": "security-2",
+            },
+            {
+                "kind": "finished",
+                "sequence": 5,
+                "subagent_id": "security-2",
+                "status": "completed",
+                "output": "Security findings and dispositions for S1-test.",
+            },
+            {
+                "kind": "spawned",
+                "sequence": 6,
+                "subagent_type": "plan-verifier",
+                "raw_input": {
+                    "prompt": (
+                        "## Target readiness unit\n"
+                        "- ID: S1-test\n"
+                        "- Kind: execution slice\n"
+                        "Security dispositions are in the Plan.\n"
                     )
                 },
             },
         ]
         evidence = runner.assert_security_review_before_readiness({"events": events})
         self.assertTrue(evidence["finished_before_readiness"])
-        self.assertEqual(evidence["covered_readiness_unit_ids"], ["ENV-test"])
+        self.assertTrue(evidence["dispositions_presented_to_readiness"])
+        self.assertEqual(
+            evidence["covered_readiness_unit_ids"], ["ENV-test", "S1-test"]
+        )
+        self.assertEqual(
+            evidence["subagent_ids"], ["security-1", "security-2"]
+        )
 
-        events[1]["sequence"] = 4
-        with self.assertRaisesRegex(AssertionError, "security-reviewer did not finish"):
+        events[4]["sequence"] = 7
+        with self.assertRaisesRegex(AssertionError, "each affected readiness"):
             runner.assert_security_review_before_readiness({"events": events})
 
-        events[1]["sequence"] = 2
-        events[1]["output"] = "Security findings for S2-test."
-        with self.assertRaisesRegex(AssertionError, "security-reviewer did not finish"):
+        events[4]["sequence"] = 5
+        events[4]["output"] = "Security findings for S2-test."
+        with self.assertRaisesRegex(AssertionError, "each affected readiness"):
             runner.assert_security_review_before_readiness({"events": events})
 
     def test_native_plan_gate_stops_after_two_revisions_per_unit(self) -> None:
@@ -482,6 +516,7 @@ class E2EDispatchTests(unittest.TestCase):
             )
 
     def test_recorded_result_covers_native_plan_and_bypass(self) -> None:
+        runner = load_runner_module()
         payload = json.loads(RESULTS.read_text(encoding="utf-8"))
         self.assertEqual(payload["schema"], "pilotfish-grok.e2e-dispatch.v4")
         self.assertTrue(payload["ok"])
@@ -516,18 +551,14 @@ class E2EDispatchTests(unittest.TestCase):
             self.assertTrue(
                 gate["security_review"]["finished_before_readiness"]
             )
+            self.assertTrue(
+                gate["security_review"]["dispositions_presented_to_readiness"]
+            )
             self.assertEqual(
                 set(gate["security_review"]["covered_readiness_unit_ids"]),
                 {unit["id"] for unit in gate["ready_units"]},
             )
-            self.assertEqual(
-                {unit["kind"] for unit in gate["ready_units"]},
-                {"program envelope", "execution slice"},
-            )
-            self.assertGreaterEqual(
-                len({unit["id"] for unit in gate["ready_units"]}),
-                2,
-            )
+            runner.assert_large_ready_units(gate)
         isolation_gate = cases["claude-isolation"]["gate"]
         self.assertTrue(isolation_gate["explore_denied"])
         self.assertTrue(isolation_gate["claude_plugin_agent_denied"])

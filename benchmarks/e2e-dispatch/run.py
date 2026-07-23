@@ -638,33 +638,36 @@ def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
 def assert_security_review_before_readiness(
     result: dict[str, Any],
 ) -> dict[str, Any]:
-    target_ids = sorted(
-        {
-            target["id"]
-            for event in result["events"]
-            if event.get("kind") == "spawned"
-            and event.get("subagent_type") == "plan-verifier"
-            and isinstance(event.get("raw_input"), dict)
-            and (
-                target := readiness_target(
-                    str(event["raw_input"].get("prompt") or "")
-                )
+    readiness_units: list[tuple[str, int]] = []
+    for event in result["events"]:
+        if (
+            event.get("kind") != "spawned"
+            or event.get("subagent_type") != "plan-verifier"
+            or not isinstance(event.get("raw_input"), dict)
+        ):
+            continue
+        prompt = str(event["raw_input"].get("prompt") or "")
+        target = readiness_target(prompt)
+        if not target:
+            continue
+        prompt_lower = prompt.lower()
+        if "disposition" not in prompt_lower or not re.search(
+            r"\b(?:folded|carried)\b|\b(?:in|into)\s+(?:the\s+)?plan\b",
+            prompt_lower,
+        ):
+            raise AssertionError(
+                f"security dispositions were not presented to {target['id']!r}"
             )
-        }
-    )
-    if not target_ids:
+        readiness_units.append((target["id"], event["sequence"]))
+    if not readiness_units:
         raise AssertionError("readiness review did not identify target units")
-    first_readiness = min(
-        event["sequence"]
-        for event in result["events"]
-        if event.get("kind") == "spawned"
-        and event.get("subagent_type") == "plan-verifier"
-    )
+
     finishes = {
         event.get("subagent_id"): event
         for event in result["events"]
         if event.get("kind") == "finished"
     }
+    covered_by: dict[str, set[str]] = {}
     for spawn in result["events"]:
         if (
             spawn.get("kind") != "spawned"
@@ -676,28 +679,36 @@ def assert_security_review_before_readiness(
         if (
             finish
             and finish.get("status") == "completed"
-            and finish["sequence"] < first_readiness
         ):
             output_words = " ".join(
                 re.findall(r"[a-z0-9]+", str(finish.get("output") or "").lower())
             )
-            covered = [
-                unit_id
-                for unit_id in target_ids
-                if f" {' '.join(re.findall(r'[a-z0-9]+', unit_id.lower()))} "
-                in f" {output_words} "
-            ]
-            if covered != target_ids:
-                continue
-            return {
-                "subagent_id": spawn.get("subagent_id"),
-                "capability_mode": "read-only",
-                "finished_before_readiness": True,
-                "covered_readiness_unit_ids": covered,
-            }
-    raise AssertionError(
-        "security-reviewer did not finish before the first readiness review"
-    )
+            for unit_id, readiness_sequence in readiness_units:
+                unit_words = " ".join(
+                    re.findall(r"[a-z0-9]+", unit_id.lower())
+                )
+                if (
+                    finish["sequence"] < readiness_sequence
+                    and f" {unit_words} " in f" {output_words} "
+                ):
+                    covered_by.setdefault(unit_id, set()).add(
+                        str(spawn.get("subagent_id"))
+                    )
+
+    target_ids = sorted({unit_id for unit_id, _ in readiness_units})
+    if sorted(covered_by) != target_ids:
+        raise AssertionError(
+            "security-reviewer did not finish before each affected readiness review"
+        )
+    return {
+        "subagent_ids": sorted(
+            {subagent_id for ids in covered_by.values() for subagent_id in ids}
+        ),
+        "capability_mode": "read-only",
+        "finished_before_readiness": True,
+        "dispositions_presented_to_readiness": True,
+        "covered_readiness_unit_ids": target_ids,
+    }
 
 
 def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
