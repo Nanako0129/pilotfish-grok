@@ -400,6 +400,12 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
         elif update_type == "tool_call_update" and update.get("status") == "failed":
             tool_meta = update.get("_meta", {}).get("x.ai/tool", {})
             original = tool_calls.get(update.get("toolCallId"), {})
+            failed_input = original.get("raw_input")
+            if (
+                original.get("tool") == "spawn_subagent"
+                and failed_input in pending_spawn_inputs
+            ):
+                pending_spawn_inputs.remove(failed_input)
             events.append(
                 {
                     "kind": "tool_failure",
@@ -565,7 +571,7 @@ def require_spawn(result: dict[str, Any], role: str) -> dict[str, Any]:
         raise AssertionError(
             f"{role} capability_mode {actual!r} != expected {expected!r}"
         )
-    return event
+    return {key: value for key, value in event.items() if key != "raw_input"}
 
 
 def git_status(fixture: Path) -> list[str]:
@@ -668,6 +674,31 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
             "native Plan had a missing verdict or readiness target: "
             f"{pre_exit_verdicts!r}"
         )
+
+    envelope_ready = False
+    revision_counts: dict[tuple[str, str], int] = {}
+    for index, event in enumerate(pre_exit_verdicts):
+        target = (event["target_id"], event["target_kind"])
+        if event["target_kind"] == "execution slice" and not envelope_ready:
+            raise AssertionError(
+                f"execution slice was reviewed before an envelope was READY: {event!r}"
+            )
+        if event["verdict"] == "REVISE":
+            revision_counts[target] = revision_counts.get(target, 0) + 1
+            if revision_counts[target] > 2 or (
+                revision_counts[target] == 2
+                and any(
+                    later["target_id"] == event["target_id"]
+                    and later["target_kind"] == event["target_kind"]
+                    for later in pre_exit_verdicts[index + 1 :]
+                )
+            ):
+                raise AssertionError(
+                    f"readiness unit exceeded the unattended two-REVISE cap: {target!r}"
+                )
+        if event["target_kind"] == "program envelope" and event["verdict"] == "READY":
+            envelope_ready = True
+
     accepted = pre_exit_verdicts[-1]
     if accepted.get("verdict") != "READY":
         raise AssertionError(f"native Plan never received READY: {verdicts!r}")
@@ -751,7 +782,12 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
 def assert_large_ready_units(gate: dict[str, Any]) -> None:
     kinds = {unit["kind"] for unit in gate["ready_units"]}
     ids = {unit["id"] for unit in gate["ready_units"]}
-    if kinds != {"program envelope", "execution slice"} or len(ids) < 2:
+    if (
+        not gate["ready_units"]
+        or gate["ready_units"][0]["kind"] != "program envelope"
+        or kinds != {"program envelope", "execution slice"}
+        or len(ids) < 2
+    ):
         raise AssertionError(
             f"large Plan did not ready a distinct envelope and slice: {gate!r}"
         )

@@ -54,6 +54,7 @@ class PolicyTests(unittest.TestCase):
             "spawn a fresh `plan-verifier` with `background: false`", gate_text
         )
         self.assertIn("exact target readiness-unit ID and kind", gate_text)
+        self.assertIn("`## Target readiness unit` block", gate_text)
         self.assertIn(
             "Only `READY` verdicts for every required readiness unit", gate_text
         )

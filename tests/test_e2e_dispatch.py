@@ -94,7 +94,11 @@ class E2EDispatchTests(unittest.TestCase):
                         "sessionUpdate": "tool_call",
                         "toolCallId": "call-1",
                         "title": "spawn_subagent",
-                        "rawInput": {"subagent_type": "Explore"},
+                        "rawInput": {
+                            "subagent_type": "Explore",
+                            "description": "Retryable spawn",
+                            "prompt": "stale prompt",
+                        },
                         "_meta": {"x.ai/tool": {"name": "spawn_subagent"}},
                     }
                 }
@@ -106,6 +110,31 @@ class E2EDispatchTests(unittest.TestCase):
                         "toolCallId": "call-1",
                         "status": "failed",
                         "rawOutput": {"message": "Subagent Explore is disabled"},
+                    }
+                }
+            },
+            {
+                "params": {
+                    "update": {
+                        "sessionUpdate": "tool_call",
+                        "toolCallId": "call-2",
+                        "title": "spawn_subagent",
+                        "rawInput": {
+                            "subagent_type": "Explore",
+                            "description": "Retryable spawn",
+                            "prompt": "corrected prompt",
+                        },
+                        "_meta": {"x.ai/tool": {"name": "spawn_subagent"}},
+                    }
+                }
+            },
+            {
+                "params": {
+                    "update": {
+                        "sessionUpdate": "subagent_spawned",
+                        "subagent_type": "Explore",
+                        "description": "Retryable spawn",
+                        "subagent_id": "retry-1",
                     }
                 }
             },
@@ -121,8 +150,14 @@ class E2EDispatchTests(unittest.TestCase):
                 for event in runner.parse_session_events(session)
                 if event["kind"] == "tool_failure"
             ]
+            spawned = [
+                event
+                for event in runner.parse_session_events(session)
+                if event["kind"] == "spawned"
+            ]
         self.assertEqual(failures[0]["tool"], "spawn_subagent")
         self.assertEqual(failures[0]["raw_input"]["subagent_type"], "Explore")
+        self.assertEqual(spawned[0]["raw_input"]["prompt"], "corrected prompt")
 
     def test_ordered_native_plan_gate_parser(self) -> None:
         runner = load_runner_module()
@@ -254,6 +289,48 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertTrue(gate["ready_before_exit"])
         self.assertTrue(gate["awaiting_native_approval"])
 
+    def test_native_plan_gate_stops_after_two_revisions_per_unit(self) -> None:
+        runner = load_runner_module()
+        events = [{"kind": "tool_call", "sequence": 0, "tool": "enter_plan_mode"}]
+        prompt = (
+            "## Target readiness unit\n"
+            "- ID: ENV-test\n"
+            "- Kind: program envelope\n"
+        )
+        for index, verdict in enumerate(("REVISE", "REVISE", "READY"), start=1):
+            subagent_id = f"pv-{index}"
+            events.extend(
+                [
+                    {
+                        "kind": "spawned",
+                        "sequence": index * 2 - 1,
+                        "subagent_type": "plan-verifier",
+                        "capability_mode": "read-only",
+                        "subagent_id": subagent_id,
+                        "raw_input": {"prompt": prompt},
+                    },
+                    {
+                        "kind": "finished",
+                        "sequence": index * 2,
+                        "subagent_id": subagent_id,
+                        "output": verdict,
+                    },
+                ]
+            )
+        events.append({"kind": "tool_call", "sequence": 7, "tool": "exit_plan_mode"})
+
+        with tempfile.TemporaryDirectory() as tmp:
+            session = Path(tmp)
+            (session / "plan.md").write_text("# Plan\n", encoding="utf-8")
+            (session / "plan_mode.json").write_text(
+                '{"state":"Active","awaiting_plan_approval":true}\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "two-REVISE cap"):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
     def test_large_ready_units_requires_envelope_and_slice(self) -> None:
         runner = load_runner_module()
         runner.assert_large_ready_units(
@@ -270,6 +347,15 @@ class E2EDispatchTests(unittest.TestCase):
                     "ready_units": [
                         {"id": "ENV-1", "kind": "program envelope"},
                         {"id": "ENV-2", "kind": "program envelope"},
+                    ]
+                }
+            )
+        with self.assertRaisesRegex(AssertionError, "distinct envelope and slice"):
+            runner.assert_large_ready_units(
+                {
+                    "ready_units": [
+                        {"id": "S1-test", "kind": "execution slice"},
+                        {"id": "ENV-test", "kind": "program envelope"},
                     ]
                 }
             )
@@ -321,6 +407,8 @@ class E2EDispatchTests(unittest.TestCase):
         for case in cases.values():
             self.assertEqual(case["session_isolation"]["claude_context_markers"], [])
             self.assertEqual(case["session_isolation"]["hook_execution_events"], 0)
+            if "spawn" in case:
+                self.assertNotIn("raw_input", case["spawn"])
 
     def test_install_only_probe_when_available(self) -> None:
         if os.environ.get("PILOTFISH_GROK_E2E_SKIP_INSTALL") == "1":

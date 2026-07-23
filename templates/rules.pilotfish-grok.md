@@ -16,11 +16,12 @@ Inside Plan Mode, discovery is read-only and the only permitted write is the
 session `plan.md`. The main session must synthesize the complete Plan, then
 spawn a fresh `plan-verifier` with `background: false`, the exact target
 readiness-unit ID and kind, the full Plan text, and relevant evidence paths.
-The child must use its installed read-only capability and review exactly that
-unit. `READY` is the bare word and nothing else. `REVISE` contains one or more
-blockers, each with `Blocker:`, `Evidence:`, `Minimum revision:`, and
-`Acceptance check:`. Malformed output is a protocol failure, not a Plan
-judgment.
+Format the target as a `## Target readiness unit` block with `- ID:` and
+`- Kind:` (`program envelope` or `execution slice`). The child must use its
+installed read-only capability and review exactly that unit. `READY` is the bare
+word and nothing else. `REVISE` contains one or more blockers, each with
+`Blocker:`, `Evidence:`, `Minimum revision:`, and `Acceptance check:`.
+Malformed output is a protocol failure, not a Plan judgment.
 
 For long or large work, keep shared outcome, non-goals, scope, architecture,
 security, dependencies, integration, budget, and stops in one program envelope.
