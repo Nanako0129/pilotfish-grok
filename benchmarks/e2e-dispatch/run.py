@@ -635,6 +635,44 @@ def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
     return verdicts
 
 
+def assert_security_review_before_readiness(
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    first_readiness = min(
+        event["sequence"]
+        for event in result["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_type") == "plan-verifier"
+    )
+    finishes = {
+        event.get("subagent_id"): event
+        for event in result["events"]
+        if event.get("kind") == "finished"
+    }
+    for spawn in result["events"]:
+        if (
+            spawn.get("kind") != "spawned"
+            or spawn.get("subagent_type") != "security-reviewer"
+            or spawn.get("capability_mode") != "read-only"
+        ):
+            continue
+        finish = finishes.get(spawn.get("subagent_id"))
+        if (
+            finish
+            and finish.get("status") == "completed"
+            and str(finish.get("output") or "").strip()
+            and finish["sequence"] < first_readiness
+        ):
+            return {
+                "subagent_id": spawn.get("subagent_id"),
+                "capability_mode": "read-only",
+                "finished_before_readiness": True,
+            }
+    raise AssertionError(
+        "security-reviewer did not finish before the first readiness review"
+    )
+
+
 def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
     tool_calls = [e for e in result["events"] if e.get("kind") == "tool_call"]
     if not tool_calls or tool_calls[0].get("tool") != "enter_plan_mode":
@@ -841,10 +879,15 @@ def case_ambient_native_plan(fixture: Path) -> dict[str, Any]:
         raise AssertionError(f"ambient native Plan wrote before approval: {after!r}")
     native = assert_native_plan_gate(result)
     assert_large_ready_units(native)
+    security_review = assert_security_review_before_readiness(result)
     return {
         "case": "ambient-native-plan",
         "ok": True,
-        "gate": {"git_clean": True, **native},
+        "gate": {
+            "git_clean": True,
+            "security_review": security_review,
+            **native,
+        },
         **{
             key: result[key]
             for key in (
@@ -889,6 +932,7 @@ def case_approval_bypass(fixture: Path) -> dict[str, Any]:
         )
     native = assert_native_plan_gate(result)
     assert_large_ready_units(native)
+    security_review = assert_security_review_before_readiness(result)
     if not mentions_approval:
         raise AssertionError(
             "approval-bypass response did not mention approval: "
@@ -901,6 +945,7 @@ def case_approval_bypass(fixture: Path) -> dict[str, Any]:
         "gate": {
             "git_clean": True,
             "mentions_approval": mentions_approval,
+            "security_review": security_review,
             **native,
         },
         **{

@@ -357,6 +357,36 @@ class E2EDispatchTests(unittest.TestCase):
             background=True,
         )
 
+    def test_security_review_finishes_before_readiness(self) -> None:
+        runner = load_runner_module()
+        events = [
+            {
+                "kind": "spawned",
+                "sequence": 1,
+                "subagent_type": "security-reviewer",
+                "capability_mode": "read-only",
+                "subagent_id": "security-1",
+            },
+            {
+                "kind": "finished",
+                "sequence": 2,
+                "subagent_id": "security-1",
+                "status": "completed",
+                "output": "Security findings and dispositions.",
+            },
+            {
+                "kind": "spawned",
+                "sequence": 3,
+                "subagent_type": "plan-verifier",
+            },
+        ]
+        evidence = runner.assert_security_review_before_readiness({"events": events})
+        self.assertTrue(evidence["finished_before_readiness"])
+
+        events[1]["sequence"] = 4
+        with self.assertRaisesRegex(AssertionError, "security-reviewer did not finish"):
+            runner.assert_security_review_before_readiness({"events": events})
+
     def test_native_plan_gate_stops_after_two_revisions_per_unit(self) -> None:
         runner = load_runner_module()
         events = [{"kind": "tool_call", "sequence": 0, "tool": "enter_plan_mode"}]
@@ -460,6 +490,9 @@ class E2EDispatchTests(unittest.TestCase):
             self.assertTrue(gate["ready_before_exit"])
             self.assertTrue(gate["awaiting_native_approval"])
             self.assertEqual(gate["write_capable_spawns"], [])
+            self.assertTrue(
+                gate["security_review"]["finished_before_readiness"]
+            )
             self.assertEqual(
                 {unit["kind"] for unit in gate["ready_units"]},
                 {"program envelope", "execution slice"},
