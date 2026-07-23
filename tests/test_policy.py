@@ -89,6 +89,7 @@ class PolicyTests(unittest.TestCase):
         for phrase in (
             "program envelope",
             "outcome, non-goals, scope",
+            "proves the slice outcome",
             "next executable slice",
             "Blocker:",
             "Evidence:",

@@ -70,6 +70,9 @@ class TemplateContractTests(unittest.TestCase):
 
         self.assertIn("READY", plan)
         self.assertIn("REVISE", plan)
+        self.assertIn("shared outcome, scope, non-goals", plan)
+        self.assertIn("explicit outcome, scope and non-goals", plan)
+        self.assertIn("acceptance that proves the slice outcome", plan)
         self.assertNotIn("CONFIRMED", plan)
         self.assertNotIn("REFUTED", plan)
 
