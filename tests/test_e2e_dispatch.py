@@ -139,8 +139,27 @@ class E2EDispatchTests(unittest.TestCase):
             {
                 "params": {
                     "update": {
+                        "sessionUpdate": "tool_call",
+                        "title": "spawn_subagent",
+                        "rawInput": {
+                            "description": "Verify envelope",
+                            "prompt": (
+                                "## Target readiness unit\n"
+                                "- ID: ENV-test\n"
+                                "- Kind: program envelope\n"
+                            ),
+                            "subagent_type": "plan-verifier",
+                        },
+                        "_meta": {"x.ai/tool": {"name": "spawn_subagent"}},
+                    }
+                }
+            },
+            {
+                "params": {
+                    "update": {
                         "sessionUpdate": "subagent_spawned",
                         "subagent_type": "plan-verifier",
+                        "description": "Verify envelope",
                         "capability_mode": "read-only",
                         "subagent_id": "pv-1",
                     }
@@ -159,8 +178,27 @@ class E2EDispatchTests(unittest.TestCase):
             {
                 "params": {
                     "update": {
+                        "sessionUpdate": "tool_call",
+                        "title": "spawn_subagent",
+                        "rawInput": {
+                            "description": "Reverify envelope",
+                            "prompt": (
+                                "## Target readiness unit\n"
+                                "- ID: ENV-test\n"
+                                "- Kind: program envelope\n"
+                            ),
+                            "subagent_type": "plan-verifier",
+                        },
+                        "_meta": {"x.ai/tool": {"name": "spawn_subagent"}},
+                    }
+                }
+            },
+            {
+                "params": {
+                    "update": {
                         "sessionUpdate": "subagent_spawned",
                         "subagent_type": "plan-verifier",
+                        "description": "Reverify envelope",
                         "capability_mode": "read-only",
                         "subagent_id": "pv-2",
                     }
@@ -207,10 +245,34 @@ class E2EDispatchTests(unittest.TestCase):
 
         self.assertTrue(gate["entered_first"])
         self.assertEqual(gate["verdicts"], ["REVISE", "READY"])
+        self.assertEqual(
+            gate["ready_units"],
+            [{"id": "ENV-test", "kind": "program envelope"}],
+        )
         self.assertEqual(gate["revision_loops"], 1)
         self.assertTrue(gate["fresh_reverification_after_revise"])
         self.assertTrue(gate["ready_before_exit"])
         self.assertTrue(gate["awaiting_native_approval"])
+
+    def test_large_ready_units_requires_envelope_and_slice(self) -> None:
+        runner = load_runner_module()
+        runner.assert_large_ready_units(
+            {
+                "ready_units": [
+                    {"id": "ENV-test", "kind": "program envelope"},
+                    {"id": "S1-test", "kind": "execution slice"},
+                ]
+            }
+        )
+        with self.assertRaisesRegex(AssertionError, "distinct envelope and slice"):
+            runner.assert_large_ready_units(
+                {
+                    "ready_units": [
+                        {"id": "ENV-1", "kind": "program envelope"},
+                        {"id": "ENV-2", "kind": "program envelope"},
+                    ]
+                }
+            )
 
     def test_recorded_result_covers_native_plan_and_bypass(self) -> None:
         payload = json.loads(RESULTS.read_text(encoding="utf-8"))
@@ -244,6 +306,14 @@ class E2EDispatchTests(unittest.TestCase):
             self.assertTrue(gate["ready_before_exit"])
             self.assertTrue(gate["awaiting_native_approval"])
             self.assertEqual(gate["write_capable_spawns"], [])
+            self.assertEqual(
+                {unit["kind"] for unit in gate["ready_units"]},
+                {"program envelope", "execution slice"},
+            )
+            self.assertGreaterEqual(
+                len({unit["id"] for unit in gate["ready_units"]}),
+                2,
+            )
         isolation_gate = cases["claude-isolation"]["gate"]
         self.assertTrue(isolation_gate["explore_denied"])
         self.assertTrue(isolation_gate["claude_plugin_agent_denied"])
@@ -284,7 +354,7 @@ class E2EDispatchTests(unittest.TestCase):
             cwd=str(ROOT),
             capture_output=True,
             text=True,
-            timeout=900,
+            timeout=3000,
         )
         self.assertEqual(
             proc.returncode,

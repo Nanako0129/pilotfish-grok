@@ -16,6 +16,16 @@
           "READY",
           "READY"
         ],
+        "ready_units": [
+          {
+            "id": "ENV-oauth2-pkce-migration",
+            "kind": "program envelope"
+          },
+          {
+            "id": "S1-core-oauth-dual-auth",
+            "kind": "execution slice"
+          }
+        ],
         "revision_loops": 0,
         "fresh_reverification_after_revise": false,
         "ready_before_exit": true,
@@ -48,6 +58,16 @@
           "REVISE",
           "READY",
           "READY"
+        ],
+        "ready_units": [
+          {
+            "id": "program-envelope",
+            "kind": "program envelope"
+          },
+          {
+            "id": "SLICE-001",
+            "kind": "execution slice"
+          }
         ],
         "revision_loops": 1,
         "fresh_reverification_after_revise": true,

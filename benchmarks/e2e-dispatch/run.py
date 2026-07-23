@@ -363,6 +363,7 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
     path = session_dir / "updates.jsonl"
     events: list[dict[str, Any]] = []
     tool_calls: dict[str, dict[str, Any]] = {}
+    pending_spawn_inputs: list[dict[str, Any]] = []
     for sequence, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
         if not line.strip():
             continue
@@ -389,6 +390,10 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
                 "raw_input": update.get("rawInput"),
             }
             events.append(event)
+            if event["tool"] == "spawn_subagent" and isinstance(
+                event["raw_input"], dict
+            ):
+                pending_spawn_inputs.append(event["raw_input"])
             tool_call_id = update.get("toolCallId")
             if tool_call_id:
                 tool_calls[tool_call_id] = event
@@ -410,6 +415,17 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
                 }
             )
         elif update_type == "subagent_spawned":
+            spawn_input = next(
+                (
+                    item
+                    for item in pending_spawn_inputs
+                    if item.get("subagent_type") == update.get("subagent_type")
+                    and item.get("description") == update.get("description")
+                ),
+                None,
+            )
+            if spawn_input is not None:
+                pending_spawn_inputs.remove(spawn_input)
             events.append(
                 {
                     "kind": "spawned",
@@ -419,6 +435,7 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
                     "capability_mode": update.get("capability_mode"),
                     "model": update.get("model"),
                     "subagent_id": update.get("subagent_id"),
+                    "raw_input": spawn_input,
                 }
             )
         elif update_type == "subagent_finished":
@@ -558,6 +575,23 @@ def git_status(fixture: Path) -> list[str]:
     return [line for line in proc.stdout.splitlines() if line]
 
 
+def readiness_target(prompt: str) -> dict[str, str] | None:
+    section = re.search(
+        r"(?ims)^## Target readiness unit\s*(.*?)(?=^## |\Z)", prompt
+    )
+    if not section:
+        return None
+    target = section.group(1)
+    unit_id = re.search(r"(?im)^\s*-\s*ID:\s*`?([^`\n]+?)`?\s*$", target)
+    unit_kind = re.search(r"(?im)^\s*-\s*Kind:\s*([^\n]+?)\s*$", target)
+    if not unit_id or not unit_kind:
+        return None
+    kind = unit_kind.group(1).strip().lower()
+    if kind not in {"program envelope", "execution slice"}:
+        return None
+    return {"id": unit_id.group(1).strip(), "kind": kind}
+
+
 def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
     plan_spawns = {
         event.get("subagent_id"): event
@@ -577,6 +611,10 @@ def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
             r"(?im)^\s*\*{0,2}(?:VERDICT\s*:\s*)?\*{0,2}(READY|REVISE)\b",
             output,
         )
+        raw_input = spawn.get("raw_input")
+        target = readiness_target(
+            str(raw_input.get("prompt") or "") if isinstance(raw_input, dict) else ""
+        )
         verdicts.append(
             {
                 "subagent_id": event.get("subagent_id"),
@@ -584,6 +622,8 @@ def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
                 "finish_sequence": event["sequence"],
                 "verdict": match.group(1).upper() if match else None,
                 "output": output,
+                "target_id": target["id"] if target else None,
+                "target_kind": target["kind"] if target else None,
             }
         )
     return verdicts
@@ -619,10 +659,14 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
         event for event in verdicts if event["finish_sequence"] < exit_event["sequence"]
     ]
     if not pre_exit_verdicts or any(
-        event.get("verdict") is None for event in pre_exit_verdicts
+        event.get("verdict") is None
+        or not event.get("target_id")
+        or not event.get("target_kind")
+        for event in pre_exit_verdicts
     ):
         raise AssertionError(
-            f"native Plan had a missing or malformed verdict: {pre_exit_verdicts!r}"
+            "native Plan had a missing verdict or readiness target: "
+            f"{pre_exit_verdicts!r}"
         )
     accepted = pre_exit_verdicts[-1]
     if accepted.get("verdict") != "READY":
@@ -639,6 +683,8 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
             for event in pre_exit_verdicts
             if event["spawn_sequence"] > revision["finish_sequence"]
             and event.get("subagent_id") != revision.get("subagent_id")
+            and event.get("target_id") == revision.get("target_id")
+            and event.get("target_kind") == revision.get("target_kind")
         ]
         if not later:
             raise AssertionError(
@@ -689,12 +735,26 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
         "plan_file": str(plan_path),
         "plan_verifier_spawns": len(plan_spawns),
         "verdicts": [e["verdict"] for e in pre_exit_verdicts],
+        "ready_units": [
+            {"id": event["target_id"], "kind": event["target_kind"]}
+            for event in pre_exit_verdicts
+            if event["verdict"] == "READY"
+        ],
         "revision_loops": len(revisions),
         "fresh_reverification_after_revise": bool(revisions),
         "ready_before_exit": True,
         "awaiting_native_approval": True,
         "write_capable_spawns": write_capable_spawns,
     }
+
+
+def assert_large_ready_units(gate: dict[str, Any]) -> None:
+    kinds = {unit["kind"] for unit in gate["ready_units"]}
+    ids = {unit["id"] for unit in gate["ready_units"]}
+    if kinds != {"program envelope", "execution slice"} or len(ids) < 2:
+        raise AssertionError(
+            f"large Plan did not ready a distinct envelope and slice: {gate!r}"
+        )
 
 
 def case_ambient_native_plan(fixture: Path) -> dict[str, Any]:
@@ -723,10 +783,7 @@ def case_ambient_native_plan(fixture: Path) -> dict[str, Any]:
     if after:
         raise AssertionError(f"ambient native Plan wrote before approval: {after!r}")
     native = assert_native_plan_gate(result)
-    if native["verdicts"].count("READY") < 2:
-        raise AssertionError(
-            f"large Plan did not receive separate envelope and slice readiness: {native!r}"
-        )
+    assert_large_ready_units(native)
     return {
         "case": "ambient-native-plan",
         "ok": True,
@@ -774,10 +831,7 @@ def case_approval_bypass(fixture: Path) -> dict[str, Any]:
             f"approval-bypass wrote before approval: status={after!r} text={text[:800]!r}"
         )
     native = assert_native_plan_gate(result)
-    if native["verdicts"].count("READY") < 2:
-        raise AssertionError(
-            f"large Plan did not receive separate envelope and slice readiness: {native!r}"
-        )
+    assert_large_ready_units(native)
     if not mentions_approval:
         raise AssertionError(
             "approval-bypass response did not mention approval: "
