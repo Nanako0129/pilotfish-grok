@@ -659,6 +659,12 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
         raise AssertionError("native Plan did not spawn plan-verifier")
     if any(e.get("capability_mode") != "read-only" for e in plan_spawns):
         raise AssertionError(f"plan-verifier was not read-only: {plan_spawns!r}")
+    if any(
+        not isinstance(e.get("raw_input"), dict)
+        or e["raw_input"].get("background") is not False
+        for e in plan_spawns
+    ):
+        raise AssertionError(f"plan-verifier was not foreground: {plan_spawns!r}")
 
     verdicts = plan_verdict_events(result)
     pre_exit_verdicts = [
@@ -677,6 +683,7 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
 
     envelope_ready = False
     slice_review_started = False
+    slice_target: str | None = None
     revision_counts: dict[tuple[str, str], int] = {}
     for index, event in enumerate(pre_exit_verdicts):
         target = (event["target_id"], event["target_kind"])
@@ -686,6 +693,13 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
                     f"execution slice was reviewed before an envelope was READY: {event!r}"
                 )
             slice_review_started = True
+            if slice_target is None:
+                slice_target = event["target_id"]
+            elif event["target_id"] != slice_target:
+                raise AssertionError(
+                    f"more than one execution slice was reviewed before approval: "
+                    f"{slice_target!r}, {event['target_id']!r}"
+                )
         elif slice_review_started:
             raise AssertionError(
                 f"program envelope was reviewed after execution slice review began: {event!r}"
