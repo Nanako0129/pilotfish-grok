@@ -589,7 +589,7 @@ def readiness_target(prompt: str) -> dict[str, str] | None:
         return None
     target = section.group(1)
     unit_id = re.search(r"(?im)^\s*-\s*ID:\s*`?([^`\n]+?)`?\s*$", target)
-    unit_kind = re.search(r"(?im)^\s*-\s*Kind:\s*([^\n]+?)\s*$", target)
+    unit_kind = re.search(r"(?im)^\s*-\s*Kind:\s*`?([^`\n]+?)`?\s*$", target)
     if not unit_id or not unit_kind:
         return None
     kind = unit_kind.group(1).strip().lower()
@@ -676,12 +676,19 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
         )
 
     envelope_ready = False
+    slice_review_started = False
     revision_counts: dict[tuple[str, str], int] = {}
     for index, event in enumerate(pre_exit_verdicts):
         target = (event["target_id"], event["target_kind"])
-        if event["target_kind"] == "execution slice" and not envelope_ready:
+        if event["target_kind"] == "execution slice":
+            if not envelope_ready:
+                raise AssertionError(
+                    f"execution slice was reviewed before an envelope was READY: {event!r}"
+                )
+            slice_review_started = True
+        elif slice_review_started:
             raise AssertionError(
-                f"execution slice was reviewed before an envelope was READY: {event!r}"
+                f"program envelope was reviewed after execution slice review began: {event!r}"
             )
         if event["verdict"] == "REVISE":
             revision_counts[target] = revision_counts.get(target, 0) + 1
