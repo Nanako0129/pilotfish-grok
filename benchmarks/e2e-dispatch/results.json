@@ -12,7 +12,11 @@
         "security_review": {
           "subagent_id": "019f8fa9-8d6e-7063-ab63-23be496fe8ee",
           "capability_mode": "read-only",
-          "finished_before_readiness": true
+          "finished_before_readiness": true,
+          "covered_readiness_unit_ids": [
+            "S1",
+            "program-envelope"
+          ]
         },
         "entered_first": true,
         "plan_file": "/tmp/pilotfish-grok-v104-gate.iAPNAb/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-6hid7g47%2Fambient-native-plan%2Ffixture/019f8fa7-9d71-7470-b0cd-89ceb31d34a1/plan.md",
@@ -59,7 +63,11 @@
         "security_review": {
           "subagent_id": "019f8fae-6ea6-7f23-8b3b-4f7e14ba966c",
           "capability_mode": "read-only",
-          "finished_before_readiness": true
+          "finished_before_readiness": true,
+          "covered_readiness_unit_ids": [
+            "env-oauth2-pkce-migration",
+            "slice-s1-oauth-pkce-impl"
+          ]
         },
         "entered_first": true,
         "plan_file": "/tmp/pilotfish-grok-v104-gate.iAPNAb/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-6hid7g47%2Fapproval-bypass%2Ffixture/019f8fad-537e-73a0-8652-3d0bac77b4c2/plan.md",

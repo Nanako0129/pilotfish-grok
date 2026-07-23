@@ -372,18 +372,31 @@ class E2EDispatchTests(unittest.TestCase):
                 "sequence": 2,
                 "subagent_id": "security-1",
                 "status": "completed",
-                "output": "Security findings and dispositions.",
+                "output": "Security findings and dispositions for ENV-test.",
             },
             {
                 "kind": "spawned",
                 "sequence": 3,
                 "subagent_type": "plan-verifier",
+                "raw_input": {
+                    "prompt": (
+                        "## Target readiness unit\n"
+                        "- ID: ENV-test\n"
+                        "- Kind: program envelope\n"
+                    )
+                },
             },
         ]
         evidence = runner.assert_security_review_before_readiness({"events": events})
         self.assertTrue(evidence["finished_before_readiness"])
+        self.assertEqual(evidence["covered_readiness_unit_ids"], ["ENV-test"])
 
         events[1]["sequence"] = 4
+        with self.assertRaisesRegex(AssertionError, "security-reviewer did not finish"):
+            runner.assert_security_review_before_readiness({"events": events})
+
+        events[1]["sequence"] = 2
+        events[1]["output"] = "Security findings for S2-test."
         with self.assertRaisesRegex(AssertionError, "security-reviewer did not finish"):
             runner.assert_security_review_before_readiness({"events": events})
 
@@ -452,6 +465,16 @@ class E2EDispatchTests(unittest.TestCase):
             runner.assert_large_ready_units(
                 {
                     "ready_units": [
+                        {"id": "ENV-1", "kind": "program envelope"},
+                        {"id": "ENV-2", "kind": "program envelope"},
+                        {"id": "S1-test", "kind": "execution slice"},
+                    ]
+                }
+            )
+        with self.assertRaisesRegex(AssertionError, "distinct envelope and slice"):
+            runner.assert_large_ready_units(
+                {
+                    "ready_units": [
                         {"id": "S1-test", "kind": "execution slice"},
                         {"id": "ENV-test", "kind": "program envelope"},
                     ]
@@ -492,6 +515,10 @@ class E2EDispatchTests(unittest.TestCase):
             self.assertEqual(gate["write_capable_spawns"], [])
             self.assertTrue(
                 gate["security_review"]["finished_before_readiness"]
+            )
+            self.assertEqual(
+                set(gate["security_review"]["covered_readiness_unit_ids"]),
+                {unit["id"] for unit in gate["ready_units"]},
             )
             self.assertEqual(
                 {unit["kind"] for unit in gate["ready_units"]},

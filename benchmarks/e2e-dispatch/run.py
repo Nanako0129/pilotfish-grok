@@ -638,6 +638,22 @@ def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
 def assert_security_review_before_readiness(
     result: dict[str, Any],
 ) -> dict[str, Any]:
+    target_ids = sorted(
+        {
+            target["id"]
+            for event in result["events"]
+            if event.get("kind") == "spawned"
+            and event.get("subagent_type") == "plan-verifier"
+            and isinstance(event.get("raw_input"), dict)
+            and (
+                target := readiness_target(
+                    str(event["raw_input"].get("prompt") or "")
+                )
+            )
+        }
+    )
+    if not target_ids:
+        raise AssertionError("readiness review did not identify target units")
     first_readiness = min(
         event["sequence"]
         for event in result["events"]
@@ -660,13 +676,24 @@ def assert_security_review_before_readiness(
         if (
             finish
             and finish.get("status") == "completed"
-            and str(finish.get("output") or "").strip()
             and finish["sequence"] < first_readiness
         ):
+            output_words = " ".join(
+                re.findall(r"[a-z0-9]+", str(finish.get("output") or "").lower())
+            )
+            covered = [
+                unit_id
+                for unit_id in target_ids
+                if f" {' '.join(re.findall(r'[a-z0-9]+', unit_id.lower()))} "
+                in f" {output_words} "
+            ]
+            if covered != target_ids:
+                continue
             return {
                 "subagent_id": spawn.get("subagent_id"),
                 "capability_mode": "read-only",
                 "finished_before_readiness": True,
+                "covered_readiness_unit_ids": covered,
             }
     raise AssertionError(
         "security-reviewer did not finish before the first readiness review"
@@ -840,12 +867,22 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
 
 def assert_large_ready_units(gate: dict[str, Any]) -> None:
     kinds = {unit["kind"] for unit in gate["ready_units"]}
-    ids = {unit["id"] for unit in gate["ready_units"]}
+    envelope_ids = {
+        unit["id"]
+        for unit in gate["ready_units"]
+        if unit["kind"] == "program envelope"
+    }
+    slice_ids = {
+        unit["id"]
+        for unit in gate["ready_units"]
+        if unit["kind"] == "execution slice"
+    }
     if (
         not gate["ready_units"]
         or gate["ready_units"][0]["kind"] != "program envelope"
         or kinds != {"program envelope", "execution slice"}
-        or len(ids) < 2
+        or len(envelope_ids) != 1
+        or len(slice_ids) != 1
     ):
         raise AssertionError(
             f"large Plan did not ready a distinct envelope and slice: {gate!r}"
