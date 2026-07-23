@@ -14,28 +14,30 @@ source writes or implementation tools and ask the user to enter Plan Mode.
 
 Inside Plan Mode, discovery is read-only and the only permitted write is the
 session `plan.md`. The main session must synthesize the complete Plan, then
-spawn a fresh `plan-verifier` with `background: false`, the full Plan text, and
-relevant evidence paths. The child must use its installed read-only capability
-and review exactly one stable readiness unit. `READY` is the bare word and
-nothing else. `REVISE` contains one or more blockers, each with `Blocker:`,
-`Evidence:`, `Minimum revision:`, and `Acceptance check:`. Malformed output is
-a protocol failure, not a Plan judgment.
+spawn a fresh `plan-verifier` with `background: false`, the exact target
+readiness-unit ID and kind, the full Plan text, and relevant evidence paths.
+The child must use its installed read-only capability and review exactly that
+unit. `READY` is the bare word and nothing else. `REVISE` contains one or more
+blockers, each with `Blocker:`, `Evidence:`, `Minimum revision:`, and
+`Acceptance check:`. Malformed output is a protocol failure, not a Plan
+judgment.
 
-For long or large work, keep shared outcome, architecture, security,
-dependencies, integration, budget, and stops in one program envelope. Split
-execution only into genuinely independent slices with stable IDs, exclusive
-owners, prerequisites, acceptance, and rollback. Review the envelope first,
-then only the next executable slice. Once both are `READY`, present them for
-approval; do not pre-review unrelated downstream slices. Shared blockers and
-unmet prerequisites still gate dependent work.
+For long or large work, keep shared outcome, non-goals, scope, architecture,
+security, dependencies, integration, budget, and stops in one program envelope.
+Split execution only into genuinely independent slices with stable IDs,
+exclusive owners, prerequisites, acceptance, and rollback. Review the envelope
+first, then only the next executable slice. Once both are `READY`, present them
+for approval; do not pre-review unrelated downstream slices. Shared blockers
+and unmet prerequisites still gate dependent work.
 
 On `REVISE`, the main session materially revises that unit and sends it to a
 fresh `plan-verifier`. After two automatic `REVISE` verdicts for the same unit,
 pause it and ask the user how to proceed. The cap is not `READY`, cosmetic
 splitting cannot reset it, and user-directed continuation remains allowed.
-Only a `READY` verdict permits `exit_plan_mode`, which presents the verified
-envelope and current slice for user approval. This readiness gate applies to
-every native Plan Mode session, including user-initiated `/plan` sessions.
+Only `READY` verdicts for every required readiness unit—the envelope and
+current slice for large work—permit `exit_plan_mode`, which presents that
+verified scope for user approval. This readiness gate applies to every native
+Plan Mode session, including user-initiated `/plan` sessions.
 
 Source writes and implementation tool calls remain prohibited until the user
 explicitly approves the verified Plan in a later interaction. A broad initial
@@ -74,8 +76,8 @@ this lifecycle:
 | Phase | Gate | Eligible delegation |
 |---|---|---|
 | Discovery | Enter native Plan Mode first for gated work, then stabilize the question, allowed scope, evidence format, and stop condition with read-only discovery. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
-| Plan | The main session writes one `plan.md` containing a program envelope and independent slices. | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
-| Approval | `READY` unlocks `exit_plan_mode` to present the verified Plan and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
+| Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, a program envelope, and independent slices. | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
+| Approval | `READY` for the envelope and current slice unlocks `exit_plan_mode` to present that scope and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
 | Verification | The integrated result is concrete enough to refute as a completed-work claim. | A fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
 

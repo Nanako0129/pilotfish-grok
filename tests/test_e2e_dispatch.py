@@ -216,6 +216,10 @@ class E2EDispatchTests(unittest.TestCase):
         payload = json.loads(RESULTS.read_text(encoding="utf-8"))
         self.assertEqual(payload["schema"], "pilotfish-grok.e2e-dispatch.v4")
         self.assertTrue(payload["ok"])
+        self.assertEqual(
+            payload["install"]["policy_version"],
+            (ROOT / "VERSION").read_text(encoding="utf-8").strip(),
+        )
         self.assertEqual(payload["claude_isolation"]["active_claude_entries"], 0)
         cases = {case["case"]: case for case in payload["cases"]}
         self.assertEqual(
