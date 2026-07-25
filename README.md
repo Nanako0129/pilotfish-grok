@@ -80,7 +80,7 @@ flowchart LR
 | Role | Capability | Effort | When |
 |---|---|---|---|
 | `scout` | read-only | low | Broad or focused read-only discovery |
-| `plan-verifier` | read-only | medium | Plan readiness; `READY` / `REVISE` |
+| `plan-verifier` | read-only | medium | One envelope or slice; bare `READY` or structured `REVISE` |
 | `security-reviewer` | read-only | high | Pre-approval security evidence |
 | `mech-executor` | all | low | Mechanical work from a complete spec |
 | `executor` | all | medium | Features and fixes needing judgment |
@@ -132,10 +132,12 @@ flowchart TD
 ## Lifecycle
 
 Large, ambiguous, architectural, risky, or explicitly plan-first work must
-enter native Grok Plan Mode before discovery. Every native Plan—including one
-started by the user with `/plan`—must receive a fresh read-only
-`plan-verifier` `READY` verdict before `exit_plan_mode` may present it for
-approval. Small, local, already-stable work stays direct in the main session.
+enter native Grok Plan Mode before discovery. Large Plans keep shared
+constraints in a program envelope and split only independent execution slices.
+The envelope and next executable slice receive fresh read-only reviews before
+`exit_plan_mode` presents them for approval. `REVISE` includes blocker,
+evidence, minimum revision, and acceptance check. After two automatic revisions
+for one unit, Grok pauses it for user direction instead of retrying forever.
 
 ```mermaid
 flowchart LR
@@ -154,7 +156,7 @@ flowchart LR
 | Phase | Gate | Eligible delegation |
 |---|---|---|
 | **Discovery** | Native Plan Mode active; stable question, scope, evidence format, stop condition | Bounded read-only `scout` on disjoint surfaces |
-| **Plan** | Session `plan.md`: outcome, non-goals, ownership, sequence, verification | Mandatory fresh read-only `plan-verifier` → `READY` / `REVISE` |
+| **Plan** | Program envelope plus independent slices | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice |
 | **Approval** | `READY` unlocks `exit_plan_mode`; user approves the verified Plan | Read-only only; no implementation brief yet |
 | **Execution** | Stable contract with exclusive ownership and done criteria | `mech-executor` / `executor` / `security-executor` |
 | **Verification** | Concrete claim to refute | Fresh `verifier` → `CONFIRMED` / `REFUTED` |
@@ -170,7 +172,7 @@ session when they share one evidence chain—do not turn that into a sequential
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.3 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.4 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

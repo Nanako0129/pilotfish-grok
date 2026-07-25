@@ -67,7 +67,7 @@ flowchart LR
 | 角色 | Capability | Effort | 時機 |
 |---|---|---|---|
 | `scout` | read-only | low | 廣或窄的唯讀 discovery |
-| `plan-verifier` | read-only | medium | Plan 就緒；`READY` / `REVISE` |
+| `plan-verifier` | read-only | medium | 一個 envelope 或 slice；單獨 `READY` 或結構化 `REVISE` |
 | `security-reviewer` | read-only | high | 批准前資安證據 |
 | `mech-executor` | all | low | 完整規格的機械工作 |
 | `executor` | all | medium | 需要判斷的功能與修復 |
@@ -114,10 +114,11 @@ flowchart TD
 ## 生命週期
 
 大型、模糊、架構、高風險或明確 plan-first 的工作，必須先進入 Grok
-原生 Plan Mode 才能 discovery。每份 native Plan——包含使用者用 `/plan`
-啟動的 Plan——都必須經 fresh read-only `plan-verifier` 回傳 `READY`，
-才能用 `exit_plan_mode` 交給使用者批准。小而穩定的工作仍由主 session
-直接完成。
+原生 Plan Mode 才能 discovery。大型 Plan 把共享限制放在 program
+envelope，只拆獨立 execution slice。Envelope 與下一個可執行 slice
+通過 fresh read-only review 後，即可用 `exit_plan_mode` 交付批准。
+`REVISE` 必須列 blocker、evidence、最小修訂與 acceptance check；同一
+unit 自動修訂兩次後停止重試，改由使用者決定。
 
 ```mermaid
 flowchart LR
@@ -136,7 +137,7 @@ flowchart LR
 | 階段 | 閘門 | 可委派 |
 |---|---|---|
 | **Discovery** | Native Plan Mode 已啟用；問題、範圍、證據格式、停止條件穩定 | 有界唯讀 `scout` |
-| **Plan** | Session `plan.md`：outcome、non-goals、ownership、序列、驗證 | 強制 fresh read-only `plan-verifier` → `READY` / `REVISE` |
+| **Plan** | Program envelope 加上獨立 slices | 強制 fresh read-only `plan-verifier` 先審 envelope，再審下一個可執行 slice |
 | **Approval** | `READY` 才能 `exit_plan_mode`；使用者批准已驗證 Plan | 僅唯讀；尚不送 implementation brief |
 | **Execution** | 穩定 contract、獨佔 ownership、done criteria | `mech-executor` / `executor` / `security-executor` |
 | **Verification** | 可被推翻的完成宣稱 | fresh `verifier` → `CONFIRMED` / `REFUTED` |
@@ -150,7 +151,7 @@ flowchart LR
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.3 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.4 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

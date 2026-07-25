@@ -53,7 +53,12 @@ class PolicyTests(unittest.TestCase):
         self.assertIn(
             "spawn a fresh `plan-verifier` with `background: false`", gate_text
         )
-        self.assertIn("Only a `READY` verdict permits `exit_plan_mode`", gate_text)
+        self.assertIn("exact target readiness-unit ID and kind", gate_text)
+        self.assertIn("`## Target readiness unit` block", gate_text)
+        self.assertIn(
+            "Only `READY` verdicts for every required readiness unit", gate_text
+        )
+        self.assertIn("the envelope and current slice for large work", gate_text)
         self.assertIn("On `REVISE`", gate_text)
         self.assertIn("Automatic permission grants", gate_text)
         self.assertIn("always-approve or `bypassPermissions`", gate_text)
@@ -74,12 +79,38 @@ class PolicyTests(unittest.TestCase):
 
         self.assertIn("Enter native Plan Mode first", lifecycle)
         self.assertIn("Mandatory fresh read-only `plan-verifier`", lifecycle)
-        self.assertIn("`READY` unlocks `exit_plan_mode`", lifecycle)
-        self.assertIn("After `READY`, call `exit_plan_mode`", lifecycle)
+        self.assertIn(
+            "`READY` for the envelope and current slice unlocks `exit_plan_mode`",
+            lifecycle,
+        )
         self.assertIn(
             "mandatory `plan-verifier` readiness gate is not an optional delegation",
             policy,
         )
+        for phrase in (
+            "program envelope",
+            "outcome, non-goals, scope",
+            "proves the slice outcome",
+            "next executable slice",
+            "keep later slices to stable IDs",
+            "Blocker:",
+            "Evidence:",
+            "Minimum revision:",
+            "Acceptance check:",
+            "two automatic `REVISE` verdicts for the same unit",
+            "pause it and ask the user",
+            "findings and dispositions into the Plan",
+        ):
+            self.assertIn(phrase, policy)
+        for phrase in (
+            "two consecutive `REFUTED` verdicts",
+            "fix the same claim",
+            "stop automatic fix-and-reverify cycling",
+            "the cap is not `CONFIRMED`",
+            "user-directed continuation remains allowed",
+            "substantially unchanged implementation",
+        ):
+            self.assertIn(phrase, " ".join(policy.split()))
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):

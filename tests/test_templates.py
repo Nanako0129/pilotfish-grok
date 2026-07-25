@@ -70,6 +70,9 @@ class TemplateContractTests(unittest.TestCase):
 
         self.assertIn("READY", plan)
         self.assertIn("REVISE", plan)
+        self.assertIn("shared outcome, scope, non-goals", plan)
+        self.assertIn("explicit outcome, scope and non-goals", plan)
+        self.assertIn("acceptance that proves the slice outcome", plan)
         self.assertNotIn("CONFIRMED", plan)
         self.assertNotIn("REFUTED", plan)
 
@@ -142,7 +145,9 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("delegation-planning layer", policy)
         self.assertIn("Never swap `plan-verifier` and `verifier`", policy)
         self.assertIn("first tool call MUST be", policy)
-        self.assertIn("Only a `READY` verdict permits `exit_plan_mode`", policy)
+        self.assertIn(
+            "Only `READY` verdicts for every required readiness unit", policy
+        )
         self.assertNotIn("run_in_background", policy)
         self.assertNotIn("Bash(", policy)
 

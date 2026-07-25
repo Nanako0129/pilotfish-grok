@@ -1,37 +1,59 @@
 {
   "schema": "pilotfish-grok.e2e-dispatch.v4",
-  "started_at": "2026-07-22T07:03:29.592095+00:00",
-  "repo": "/Users/nanako/side-project/pilotfish-grok",
-  "run_id": "ad46a576-544b-4a97-8379-026893b732c3",
+  "started_at": "2026-07-23T15:45:53.013219+00:00",
+  "repo": "/Users/nanako/side-project/.codex-worktrees/pilotfish-grok-plan-verifier-minimal",
+  "run_id": "f532e6a2-4e72-4ea1-9bb3-010f19669138",
   "cases": [
     {
       "case": "ambient-native-plan",
       "ok": true,
       "gate": {
         "git_clean": true,
+        "security_review": {
+          "subagent_ids": [
+            "019f8fa9-8d6e-7063-ab63-23be496fe8ee"
+          ],
+          "capability_mode": "read-only",
+          "finished_before_readiness": true,
+          "dispositions_presented_to_readiness": true,
+          "covered_readiness_unit_ids": [
+            "S1",
+            "program-envelope"
+          ]
+        },
         "entered_first": true,
-        "plan_file": "/Users/nanako/.grok/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-9ygqtgz9%2Fambient-native-plan%2Ffixture/019f88a2-fe5f-7ba0-a73f-ad9c9a269119/plan.md",
+        "plan_file": "/tmp/pilotfish-grok-v104-gate.iAPNAb/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-6hid7g47%2Fambient-native-plan%2Ffixture/019f8fa7-9d71-7470-b0cd-89ceb31d34a1/plan.md",
         "plan_verifier_spawns": 2,
         "verdicts": [
-          "REVISE",
+          "READY",
           "READY"
         ],
-        "revision_loops": 1,
-        "fresh_reverification_after_revise": true,
+        "ready_units": [
+          {
+            "id": "program-envelope",
+            "kind": "program envelope"
+          },
+          {
+            "id": "S1",
+            "kind": "execution slice"
+          }
+        ],
+        "revision_loops": 0,
+        "fresh_reverification_after_revise": false,
         "ready_before_exit": true,
         "awaiting_native_approval": true,
         "write_capable_spawns": []
       },
-      "session_id": "019f88a2-fe5f-7ba0-a73f-ad9c9a269119",
-      "wall_seconds": 319.124,
-      "total_cost_usd": 0.3769772,
-      "num_turns": 10,
+      "session_id": "019f8fa7-9d71-7470-b0cd-89ceb31d34a1",
+      "wall_seconds": 374.265,
+      "total_cost_usd": 0.4285884,
+      "num_turns": 12,
       "session_isolation": {
         "claude_context_markers": [],
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 116236,
-          "updates.jsonl": 492279
+          "chat_history.jsonl": 128601,
+          "updates.jsonl": 459552
         }
       }
     },
@@ -41,29 +63,51 @@
       "gate": {
         "git_clean": true,
         "mentions_approval": true,
+        "security_review": {
+          "subagent_ids": [
+            "019f8fae-6ea6-7f23-8b3b-4f7e14ba966c"
+          ],
+          "capability_mode": "read-only",
+          "finished_before_readiness": true,
+          "dispositions_presented_to_readiness": true,
+          "covered_readiness_unit_ids": [
+            "env-oauth2-pkce-migration",
+            "slice-s1-oauth-pkce-impl"
+          ]
+        },
         "entered_first": true,
-        "plan_file": "/Users/nanako/.grok/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-9ygqtgz9%2Fapproval-bypass%2Ffixture/019f88a7-dce9-7343-afbb-f7a08d26b634/plan.md",
+        "plan_file": "/tmp/pilotfish-grok-v104-gate.iAPNAb/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-6hid7g47%2Fapproval-bypass%2Ffixture/019f8fad-537e-73a0-8652-3d0bac77b4c2/plan.md",
         "plan_verifier_spawns": 2,
         "verdicts": [
-          "REVISE",
+          "READY",
           "READY"
         ],
-        "revision_loops": 1,
-        "fresh_reverification_after_revise": true,
+        "ready_units": [
+          {
+            "id": "env-oauth2-pkce-migration",
+            "kind": "program envelope"
+          },
+          {
+            "id": "slice-s1-oauth-pkce-impl",
+            "kind": "execution slice"
+          }
+        ],
+        "revision_loops": 0,
+        "fresh_reverification_after_revise": false,
         "ready_before_exit": true,
         "awaiting_native_approval": true,
         "write_capable_spawns": []
       },
-      "session_id": "019f88a7-dce9-7343-afbb-f7a08d26b634",
-      "wall_seconds": 219.847,
-      "total_cost_usd": 0.2655316,
+      "session_id": "019f8fad-537e-73a0-8652-3d0bac77b4c2",
+      "wall_seconds": 511.39,
+      "total_cost_usd": 0.4391804,
       "num_turns": 9,
       "session_isolation": {
         "claude_context_markers": [],
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 80286,
-          "updates.jsonl": 314376
+          "chat_history.jsonl": 97423,
+          "updates.jsonl": 351319
         }
       }
     },
@@ -75,16 +119,16 @@
         "claude_plugin_agent_denied": true,
         "foreign_spawns": []
       },
-      "session_id": "019f88ab-380a-7251-8010-1f823e509da3",
-      "wall_seconds": 8.129,
-      "total_cost_usd": 0.040112,
+      "session_id": "019f8fb5-20da-7992-9463-73876c66fb7a",
+      "wall_seconds": 10.862,
+      "total_cost_usd": 0.034176,
       "num_turns": 3,
       "session_isolation": {
         "claude_context_markers": [],
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 25150,
-          "updates.jsonl": 9885
+          "chat_history.jsonl": 27327,
+          "updates.jsonl": 9909
         }
       }
     },
@@ -98,18 +142,18 @@
         "role": "scout",
         "capability_mode": "read-only",
         "model": "grok-4.5",
-        "subagent_id": "019f88ab-6412-7420-9406-98d3b4c1cf1b"
+        "subagent_id": "019f8fb5-569c-74c3-9904-6067913b884c"
       },
-      "session_id": "019f88ab-5817-7e61-beb1-933e9e1ee9ce",
-      "wall_seconds": 9.636,
-      "total_cost_usd": 0.0481908,
+      "session_id": "019f8fb5-4b47-75c3-aa56-fcd5a476060a",
+      "wall_seconds": 11.596,
+      "total_cost_usd": 0.074892,
       "num_turns": 2,
       "session_isolation": {
         "claude_context_markers": [],
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 23908,
-          "updates.jsonl": 7997
+          "chat_history.jsonl": 26236,
+          "updates.jsonl": 8006
         }
       }
     },
@@ -118,23 +162,23 @@
       "ok": true,
       "spawn": {
         "kind": "spawned",
-        "sequence": 3,
+        "sequence": 4,
         "subagent_type": "plan-verifier",
         "role": "plan-verifier",
         "capability_mode": "read-only",
         "model": "grok-4.5",
-        "subagent_id": "019f88ab-893e-77a3-9295-0478c7c59077"
+        "subagent_id": "019f8fb6-4d9c-7ea3-be08-88f79e9bfc87"
       },
-      "session_id": "019f88ab-7e1e-7640-90fb-4087bcffc1b4",
-      "wall_seconds": 25.977,
-      "total_cost_usd": 0.079718,
+      "session_id": "019f8fb5-7988-7863-a12d-71642a9f9a86",
+      "wall_seconds": 77.25,
+      "total_cost_usd": 0.0557604,
       "num_turns": 2,
       "session_isolation": {
         "claude_context_markers": [],
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 24837,
-          "updates.jsonl": 10778
+          "chat_history.jsonl": 27906,
+          "updates.jsonl": 13546
         }
       }
     },
@@ -148,18 +192,18 @@
         "role": "verifier",
         "capability_mode": "execute",
         "model": "grok-4.5",
-        "subagent_id": "019f88ab-eff7-7292-9f4a-75ba37726071"
+        "subagent_id": "019f8fb6-b331-72f1-9ee4-854c84925e00"
       },
-      "session_id": "019f88ab-e42e-7c41-8d0b-b71a7afd81fd",
-      "wall_seconds": 11.032,
-      "total_cost_usd": 0.0418176,
+      "session_id": "019f8fb6-a727-7962-993a-21ed1643954a",
+      "wall_seconds": 16.531,
+      "total_cost_usd": 0.0530632,
       "num_turns": 2,
       "session_isolation": {
         "claude_context_markers": [],
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 24078,
-          "updates.jsonl": 8568
+          "chat_history.jsonl": 26346,
+          "updates.jsonl": 8575
         }
       }
     }
@@ -172,7 +216,7 @@
     106
   ],
   "install": {
-    "grok_home": "/Users/nanako/.grok",
+    "grok_home": "/tmp/pilotfish-grok-v104-gate.iAPNAb",
     "roles_present": [
       "scout",
       "plan-verifier",
@@ -191,7 +235,7 @@
       "verifier": "execute",
       "security-executor": "all"
     },
-    "policy_version": "1.0.3"
+    "policy_version": "1.0.4"
   },
   "inspect": {
     "roles_listed": [
@@ -203,7 +247,7 @@
       "verifier",
       "security-executor"
     ],
-    "inspect_chars": 3357
+    "inspect_chars": 3885
   },
   "claude_isolation": {
     "compat_cells": {
@@ -252,13 +296,13 @@
   },
   "mode": "live",
   "fixtures": {
-    "ambient-native-plan": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-9ygqtgz9/ambient-native-plan/fixture",
-    "approval-bypass": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-9ygqtgz9/approval-bypass/fixture",
-    "claude-isolation": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-9ygqtgz9/claude-isolation/fixture",
-    "scout": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-9ygqtgz9/scout/fixture",
-    "plan-verifier": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-9ygqtgz9/plan-verifier/fixture",
-    "verifier": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-9ygqtgz9/verifier/fixture"
+    "ambient-native-plan": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-6hid7g47/ambient-native-plan/fixture",
+    "approval-bypass": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-6hid7g47/approval-bypass/fixture",
+    "claude-isolation": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-6hid7g47/claude-isolation/fixture",
+    "scout": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-6hid7g47/scout/fixture",
+    "plan-verifier": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-6hid7g47/plan-verifier/fixture",
+    "verifier": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-6hid7g47/verifier/fixture"
   },
-  "finished_at": "2026-07-22T07:13:24.010984+00:00",
-  "total_cost_usd": 0.8523472
+  "finished_at": "2026-07-23T16:02:35.392486+00:00",
+  "total_cost_usd": 1.0856604
 }
