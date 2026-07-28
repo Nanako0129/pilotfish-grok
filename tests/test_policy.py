@@ -73,6 +73,37 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertIn("unattended run must stop", gate_text)
 
+    def test_security_execution_gate_is_front_loaded_and_fail_closed(self) -> None:
+        policy = POLICY.read_text(encoding="utf-8")
+        security_gate = "Every approved security-sensitive execution slice"
+        main_policy = "Main-session policy for Grok Build"
+
+        self.assertLess(policy.index("### Non-negotiable native Plan gate"), policy.index(security_gate))
+        self.assertLess(policy.index(security_gate), policy.index(main_policy))
+        gate_text = " ".join(
+            policy[policy.index(security_gate) : policy.index(main_policy)].split()
+        )
+        for phrase in (
+            "Findings from `security-reviewer` on a program envelope remain constraints "
+            "on each affected slice, but the envelope itself is not an executable contract",
+            "Before any post-approval source mutation or implementation tool call "
+            "for that slice, the main session MUST successfully spawn `security-executor`",
+            "every role other than `security-executor` MUST NOT implement that slice directly",
+            "direct-work allowance, dispatch brake, coordination-cost heuristic, "
+            "matching-role-optional rule, single-unknown-bug exception, and "
+            "failed-attempt takeover rule do not waive",
+            "If the spawn is unavailable or fails, stop without source mutation "
+            "or implementation tools",
+            "If implementation attempts fail, stop or retask through `security-executor`",
+            "neither the main session nor another role may take over the slice",
+        ):
+            self.assertIn(phrase, gate_text)
+        self.assertIn(
+            "The main session may take over only non-security-sensitive work; "
+            "a security-sensitive slice must stop or be retasked through `security-executor`",
+            " ".join(policy.split()),
+        )
+
     def test_native_plan_lifecycle_requires_readiness_before_exit(self) -> None:
         policy = POLICY.read_text(encoding="utf-8")
         lifecycle = policy[policy.index("| Discovery |") : policy.index("### Dispatch")]
@@ -100,6 +131,11 @@ class PolicyTests(unittest.TestCase):
             "two automatic `REVISE` verdicts for the same unit",
             "pause it and ask the user",
             "findings and dispositions into the Plan",
+            "every initial review or fresh re-review of a security-affected unit",
+            "do not rely on the Plan text alone for that handoff",
+            "assign stable IDs to the affected program envelope",
+            "Include every exact affected unit ID in its brief",
+            "If an affected ID changes or is added, repeat security review",
         ):
             self.assertIn(phrase, policy)
         for phrase in (

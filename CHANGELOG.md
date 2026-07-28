@@ -2,6 +2,13 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.5] — 2026-07-28
+
+Require approved security-sensitive execution slices to execute only through a
+successfully spawned `security-executor`. Envelope findings remain constraints
+without making envelopes executable; direct implementation, failed-attempt
+takeover, and orchestration exceptions cannot waive the boundary.
+
 ## [1.0.4] — 2026-07-23
 
 Bound Plan review loops with program envelopes and independently approvable

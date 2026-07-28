@@ -1,5 +1,5 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.4 -->
+<!-- pilotfish-grok v1.0.5 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
@@ -22,6 +22,9 @@ installed read-only capability and review exactly that unit. `READY` is the bare
 word and nothing else. `REVISE` contains one or more blockers, each with
 `Blocker:`, `Evidence:`, `Minimum revision:`, and `Acceptance check:`.
 Malformed output is a protocol failure, not a Plan judgment.
+For every initial review or fresh re-review of a security-affected unit, the
+brief must explicitly state that `security-reviewer` findings and dispositions
+were carried into the Plan; do not rely on the Plan text alone for that handoff.
 
 For long or large work, keep shared outcome, non-goals, scope, architecture,
 security, dependencies, integration, budget, and stops in one program envelope.
@@ -49,6 +52,20 @@ request, or a request to skip planning, skip approval, start immediately, or
 continue until files change, does not waive this gate. Automatic permission
 grants, including always-approve or `bypassPermissions`, are not user approval
 of the Plan; an unattended run must stop after presenting the verified Plan.
+
+Every approved security-sensitive execution slice has a mandatory execution
+boundary. Findings from `security-reviewer` on a program envelope remain
+constraints on each affected slice, but the envelope itself is not an
+executable contract. Before any post-approval source mutation or implementation
+tool call for that slice, the main session MUST successfully spawn
+`security-executor` with the approved stable contract. The main session and
+every role other than `security-executor` MUST NOT implement that slice
+directly. The direct-work allowance, dispatch brake, coordination-cost
+heuristic, matching-role-optional rule, single-unknown-bug exception, and
+failed-attempt takeover rule do not waive this boundary. If the spawn is
+unavailable or fails, stop without source mutation or implementation tools. If
+implementation attempts fail, stop or retask through `security-executor`;
+neither the main session nor another role may take over the slice.
 
 Main-session policy for Grok Build. If you are running as a subagent role
 (`scout`, `plan-verifier`, `security-reviewer`, `mech-executor`, `executor`,
@@ -115,9 +132,13 @@ main session when they share one reasoning chain. Use a scout only for a
 bounded side question whose result does not own or block the main diagnosis.
 
 Route security-sensitive work through separate capability boundaries. Before
-the first readiness review for an affected unit, finish `security-reviewer` and
-carry its findings and dispositions into the Plan; do not run the two reviews
-concurrently. After approval, give the stable implementation contract to
+spawning `security-reviewer`, assign stable IDs to the affected program envelope
+and current execution slice. Include every exact affected unit ID in its brief
+and require its output to name each one. Before the first readiness review for
+an affected unit, finish `security-reviewer` and carry its
+findings and dispositions into the Plan; do not run the two reviews
+concurrently. If an affected ID changes or is added, repeat security review
+before readiness. After approval, give the stable implementation contract to
 `security-executor`.
 
 ### Routing ownership
@@ -130,7 +151,9 @@ override only for a truly ad-hoc agent with no matching role definition.
 Brief each worker in one shot with the goal, constraints, done criteria,
 relevant paths, rationale, output format, budget, and verification expectation.
 Start with the cheapest eligible role. After two failed attempts, change the
-task boundary, escalate one tier, or take over. Treat scout findings as inputs;
+task boundary or escalate one tier. The main session may take over only
+non-security-sensitive work; a security-sensitive slice must stop or be
+retasked through `security-executor`. Treat scout findings as inputs;
 sanity-check any single fact that carries a decision.
 
 ### Parallelism and long work

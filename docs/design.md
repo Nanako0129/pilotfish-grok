@@ -116,9 +116,9 @@ automatic revisions for one unit are the limit before user direction. This
 pauses that unit without treating it as ready or blocking unrelated ready
 slices; shared constraints and prerequisites still gate dependent work.
 
-A single unknown bug should not become a sequential `scout` → `executor`
-pipeline when diagnosis, patch design, and live verification share one evidence
-chain.
+For non-security-sensitive work, a single unknown bug should not become a
+sequential `scout` → `executor` pipeline when diagnosis, patch design, and live
+verification share one evidence chain.
 
 ## Deliberately left out
 
