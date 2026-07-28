@@ -97,18 +97,21 @@ as a pilotfish-grok named role with custom routing.
 ### Cue-free dispatch gate
 
 Before using repository discovery or implementation tools, classify the bounded
-work and apply the first matching rule without waiting for the user to name a
-role:
+work and apply every matching gate in phase order without waiting for the user
+to name a role:
 
+- For security-sensitive work, use the mandatory `security-reviewer`,
+  `plan-verifier`, and `security-executor` boundaries. Only
+  `security-executor` may implement that slice; do not select
+  `mech-executor` or `executor` for it.
 - After entering Plan Mode when required, spawn `scout` before any repository
   search that must locate an unknown file or symbol, or any broad or cross-file
   reconnaissance.
-- Spawn `mech-executor` before a fully specified mechanical implementation
-  that must keep multiple files or surfaces consistent.
-- Spawn `executor` before a bounded non-security implementation that requires
-  local engineering judgment.
-- Use the mandatory `security-reviewer`, `plan-verifier`, and
-  `security-executor` boundaries for security-sensitive or gated work.
+- For non-security work, spawn `mech-executor` before a fully specified
+  mechanical implementation that must keep multiple files or surfaces
+  consistent.
+- For non-security work, spawn `executor` before a bounded implementation that
+  requires local engineering judgment.
 - After integrating any non-trivial implementation, spawn a fresh `verifier`
   and collect its `CONFIRMED` or `REFUTED` result before claiming completion.
 

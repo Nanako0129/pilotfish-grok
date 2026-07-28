@@ -123,10 +123,12 @@ class PolicyTests(unittest.TestCase):
             " ".join(policy.split()),
         )
         for phrase in (
+            "apply every matching gate in phase order",
+            "Only `security-executor` may implement that slice",
+            "do not select `mech-executor` or `executor` for it",
             "spawn `scout` before any repository search that must locate an unknown file",
-            "Spawn `mech-executor` before a fully specified mechanical implementation",
-            "Spawn `executor` before a bounded non-security implementation",
-            "mandatory `security-reviewer`, `plan-verifier`, and `security-executor`",
+            "For non-security work, spawn `mech-executor` before a fully specified",
+            "For non-security work, spawn `executor` before a bounded implementation",
             "spawn a fresh `verifier`",
             "routing gates, not prompt keywords",
             "cannot turn matching work into main-session execution",

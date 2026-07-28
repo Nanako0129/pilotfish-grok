@@ -134,6 +134,90 @@ class E2EDispatchTests(unittest.TestCase):
             self.assertTrue(runner.is_confirmed(verdict))
         self.assertFalse(runner.is_confirmed("REFUTED"))
 
+    def test_executor_ownership_and_verifier_claim_are_enforced(self) -> None:
+        runner = load_runner_module()
+        events = [
+            {
+                "kind": "spawned",
+                "sequence": 1,
+                "subagent_type": "executor",
+                "capability_mode": "all",
+                "subagent_id": "executor-1",
+            },
+            {
+                "kind": "finished",
+                "sequence": 2,
+                "subagent_id": "executor-1",
+                "status": "completed",
+                "output": "Implemented.",
+            },
+            {
+                "kind": "tool_call",
+                "sequence": 3,
+                "tool": "write",
+            },
+            {
+                "kind": "spawned",
+                "sequence": 4,
+                "subagent_type": "verifier",
+                "capability_mode": "execute",
+                "subagent_id": "verifier-1",
+                "raw_input": {"prompt": "Check the change."},
+            },
+            {
+                "kind": "finished",
+                "sequence": 5,
+                "subagent_id": "verifier-1",
+                "status": "completed",
+                "output": "CONFIRMED",
+            },
+        ]
+        result = {"events": events, "spawn_events": events, "text": ""}
+
+        with self.assertRaisesRegex(AssertionError, "parent session mutated"):
+            runner.require_role_owned_implementation(result, "executor")
+
+        events[2]["tool"] = "run_terminal_command"
+        events[2]["raw_input"] = {
+            "command": (
+                "python3 -m unittest test_client.py -v && "
+                "python3 -m unittest test_auth.py -v"
+            )
+        }
+        implementation = runner.require_role_owned_implementation(result, "executor")
+        self.assertEqual(implementation["parent_mutation_tools"], [])
+        self.assertEqual(
+            implementation["parent_verification_tools"],
+            ["run_terminal_command"],
+        )
+
+        events[2]["raw_input"]["command"] += " && sed -i old new client.py"
+        with self.assertRaisesRegex(AssertionError, "parent session mutated"):
+            runner.require_role_owned_implementation(result, "executor")
+        events[2]["raw_input"]["command"] = (
+            "python3 -m unittest test_client.py -v"
+        )
+
+        with self.assertRaisesRegex(AssertionError, "not bound"):
+            runner.require_bound_verifier(
+                result,
+                after_role="executor",
+                claim_terms=("client.py", "test_client.py"),
+            )
+
+        events[3]["raw_input"]["prompt"] = (
+            "Verify client.py and test_client.py preserve the public API."
+        )
+        verification = runner.require_bound_verifier(
+            result,
+            after_role="executor",
+            claim_terms=("client.py", "test_client.py", "public API"),
+        )
+        self.assertEqual(
+            verification["claim_terms"],
+            ["client.py", "test_client.py", "public API"],
+        )
+
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
         updates = [
@@ -587,10 +671,21 @@ class E2EDispatchTests(unittest.TestCase):
         gate = cases["cue-free-security"]["gate"]
         self.assertTrue(gate["ready_before_exit"])
         self.assertTrue(gate["awaiting_native_approval"])
+        self.assertTrue(gate["git_clean_before_approval"])
         self.assertEqual(gate["write_capable_spawns"], [])
         self.assertTrue(gate["security_review"]["finished_before_readiness"])
         self.assertTrue(gate["resumed_after_user_continuation"])
         runner.assert_large_ready_units(gate)
+        for case_name in (
+            "cue-free-mechanical",
+            "cue-free-judgment",
+            "cue-free-security",
+        ):
+            case_gate = cases[case_name]["gate"]
+            self.assertEqual(
+                case_gate["implementation"]["parent_mutation_tools"], []
+            )
+            self.assertTrue(case_gate["verification"]["claim_terms"])
         self.assertTrue(payload["cue_free_gate"]["complete"])
         self.assertEqual(payload["cue_free_gate"]["missing_roles"], [])
         self.assertEqual(

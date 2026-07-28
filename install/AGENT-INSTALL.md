@@ -191,8 +191,9 @@ Optional manual smoke (user or agent after restart):
   refuse to edit (capability `execute`).
 - Attempt the exact case-sensitive Claude agent names from Step 1 and confirm
   Grok rejects them as disabled. For a full live run, each persisted session
-  must contain zero `/.claude/` context markers and zero `hook_execution`
-  events.
+  must contain zero `/.claude/` context markers and zero Claude-derived
+  `hook_execution` events. Native Grok hooks may execute; record their count
+  without treating them as Claude contamination.
 
 ## Uninstall
 

@@ -33,6 +33,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -721,6 +722,87 @@ def require_completed_role(
     }
 
 
+def require_role_owned_implementation(
+    result: dict[str, Any], role: str, *, after_sequence: int | None = None
+) -> dict[str, Any]:
+    implementation = require_completed_role(result, role)
+    parent_verification_tools = []
+    parent_mutations = []
+    for event in result["events"]:
+        if (
+            event.get("kind") != "tool_call"
+            or event.get("tool") == "spawn_subagent"
+            or (after_sequence is not None and event["sequence"] <= after_sequence)
+        ):
+            continue
+        if event.get("read_only") is True:
+            continue
+        if event.get("tool") == "run_terminal_command" and is_unittest_command(
+            event.get("raw_input")
+        ):
+            parent_verification_tools.append(event.get("tool"))
+            continue
+        parent_mutations.append(event)
+    if parent_mutations:
+        raise AssertionError(
+            f"parent session mutated repository work assigned to {role}: "
+            f"{[(event['sequence'], event.get('tool')) for event in parent_mutations]!r}"
+        )
+    implementation["parent_mutation_tools"] = []
+    implementation["parent_verification_tools"] = parent_verification_tools
+    return implementation
+
+
+def is_unittest_command(raw_input: Any) -> bool:
+    if not isinstance(raw_input, dict):
+        return False
+    command = raw_input.get("command")
+    if not isinstance(command, str):
+        return False
+    for part in command.split("&&"):
+        try:
+            argv = shlex.split(part)
+        except ValueError:
+            return False
+        if (
+            len(argv) < 3
+            or Path(argv[0]).name not in {"python", "python3"}
+            or argv[1:3] != ["-m", "unittest"]
+            or any(not re.fullmatch(r"[\w./-]+", arg) for arg in argv[3:])
+        ):
+            return False
+    return True
+
+
+def require_bound_verifier(
+    result: dict[str, Any], *, after_role: str, claim_terms: tuple[str, ...]
+) -> dict[str, Any]:
+    verification = require_completed_role(
+        result, "verifier", after_role=after_role
+    )
+    spawn = next(
+        event
+        for event in result["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_id") == verification["subagent_id"]
+    )
+    raw_input = spawn.get("raw_input")
+    prompt = (
+        str(raw_input.get("prompt") or "")
+        if isinstance(raw_input, dict)
+        else ""
+    )
+    missing = [term for term in claim_terms if term.lower() not in prompt.lower()]
+    if missing:
+        raise AssertionError(
+            f"verifier prompt was not bound to the implementation claim: {missing!r}"
+        )
+    if not is_confirmed(verification["output"]):
+        raise AssertionError(f"verification failed: {verification!r}")
+    verification["claim_terms"] = list(claim_terms)
+    return verification
+
+
 def cue_free_case_result(
     name: str,
     prompt: str,
@@ -1056,6 +1138,7 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
         "revision_loops": len(revisions),
         "fresh_reverification_after_revise": bool(revisions),
         "ready_before_exit": True,
+        "exit_sequence": exit_event["sequence"],
         "awaiting_native_approval": True,
         "write_capable_spawns": write_capable_spawns,
     }
@@ -1221,12 +1304,18 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
     )
     assert_cue_free_prompt(prompt)
     result = run_grok_prompt(prompt, fixture, max_turns=20)
-    implementation = require_completed_role(result, "mech-executor")
-    verification = require_completed_role(
-        result, "verifier", after_role="mech-executor"
+    implementation = require_role_owned_implementation(result, "mech-executor")
+    verification = require_bound_verifier(
+        result,
+        after_role="mech-executor",
+        claim_terms=(
+            "validate_api_key",
+            "auth.py",
+            "test_auth.py",
+            "README.md",
+            "behavior",
+        ),
     )
-    if not is_confirmed(verification["output"]):
-        raise AssertionError(f"cue-free mechanical verification failed: {verification!r}")
     diff = run_cmd(["git", "diff", "--"], cwd=fixture, timeout=30).stdout
     if "validate_api_key" not in diff or re.search(r"^\+.*authenticate\b", diff, re.M):
         raise AssertionError(f"mechanical rename was incomplete: {diff[:1600]}")
@@ -1252,10 +1341,18 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
     )
     assert_cue_free_prompt(prompt)
     result = run_grok_prompt(prompt, fixture, max_turns=24)
-    implementation = require_completed_role(result, "executor")
-    verification = require_completed_role(result, "verifier", after_role="executor")
-    if not is_confirmed(verification["output"]):
-        raise AssertionError(f"cue-free judgment verification failed: {verification!r}")
+    implementation = require_role_owned_implementation(result, "executor")
+    verification = require_bound_verifier(
+        result,
+        after_role="executor",
+        claim_terms=(
+            "client.py",
+            "test_client.py",
+            "public API",
+            "transient",
+            "3",
+        ),
+    )
     if not git_status(fixture):
         raise AssertionError("cue-free judgment made no repository change")
     assert_fixture_tests(fixture)
@@ -1278,6 +1375,9 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
     continuation = "Implement the proposed change."
     assert_cue_free_prompt(prompt)
     assert_cue_free_prompt(continuation)
+    before = git_status(fixture)
+    if before:
+        raise AssertionError(f"security fixture was not clean before planning: {before!r}")
     planned = run_grok_prompt(
         prompt,
         fixture,
@@ -1288,6 +1388,8 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
     assert_large_ready_units(native)
     security_review = assert_security_review_before_readiness(planned)
     require_completed_role(planned, "scout")
+    if git_status(fixture) != before:
+        raise AssertionError("security planning turn modified the fixture before approval")
 
     result = run_grok_prompt(
         continuation,
@@ -1296,12 +1398,21 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
         timeout_seconds=900,
         resume_session_id=planned["session_id"],
     )
-    implementation = require_completed_role(result, "security-executor")
-    verification = require_completed_role(
-        result, "verifier", after_role="security-executor"
+    implementation = require_role_owned_implementation(
+        result,
+        "security-executor",
+        after_sequence=native["exit_sequence"],
     )
-    if not is_confirmed(verification["output"]):
-        raise AssertionError(f"cue-free security verification failed: {verification!r}")
+    verification = require_bound_verifier(
+        result,
+        after_role="security-executor",
+        claim_terms=(
+            "hmac.compare_digest",
+            "auth.py",
+            "test_auth.py",
+            "README.md",
+        ),
+    )
     if not git_status(fixture):
         raise AssertionError("cue-free security execution made no repository change")
     assert_fixture_tests(fixture)
@@ -1322,6 +1433,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
         "security_review": security_review,
         "implementation": implementation,
         "verification": verification,
+        "git_clean_before_approval": True,
         "tests_passed": True,
         "resumed_after_user_continuation": True,
     }

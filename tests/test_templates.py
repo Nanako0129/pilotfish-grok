@@ -163,6 +163,8 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("config.toml.pilotfish-grok-*", installer)
         self.assertIn("Do not write anything until the user explicitly approves", installer)
         self.assertIn("Never modify `~/.claude/`", installer)
+        self.assertIn("zero Claude-derived", installer)
+        self.assertIn("Native Grok hooks may execute", installer)
         self.assertIn("[subagents.toggle]", installer)
         self.assertIn("[plugins] disabled", installer)
         self.assertIn("all six `[compat.claude]`", installer)
