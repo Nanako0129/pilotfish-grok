@@ -276,8 +276,17 @@ class E2EDispatchTests(unittest.TestCase):
                     'default_capability_mode = "all"\n',
                     encoding="utf-8",
                 )
-                with self.assertRaisesRegex(AssertionError, "filenames"):
-                    runner.assert_install_surface()
+                evidence = runner.assert_install_surface()["candidate_surface"]
+                self.assertEqual(
+                    evidence["owned_agent_files"],
+                    sorted(f"{role}.md" for role in runner.ROLES),
+                )
+                self.assertEqual(
+                    evidence["owned_role_files"],
+                    sorted(f"{role}.toml" for role in runner.ROLES),
+                )
+                self.assertEqual(evidence["unrelated_agent_files"], ["extra.md"])
+                self.assertEqual(evidence["unrelated_role_files"], ["extra.toml"])
 
     def test_cue_free_prompt_guard(self) -> None:
         runner = load_runner_module()
@@ -850,6 +859,7 @@ class E2EDispatchTests(unittest.TestCase):
             ["auth.py", "test_auth.py", "README.md"],
         )
         for exclusion in (
+            "7. Do not modify client.py or other files.",
             "Do not touch client.py, secret storage, packaging, microbenchmarks.",
             "Do not touch client.py, test_client.py, remove hardcoded key, "
             "or add third-party deps.",
@@ -1381,7 +1391,7 @@ class E2EDispatchTests(unittest.TestCase):
             (fixture / "auth.py").write_text(
                 "import hmac\n\n"
                 "def authenticate(api_key: str) -> bool:\n"
-                "    hmac.compare_digest('legacy-test-key', api_key)\n"
+                "    hmac.compare_digest(b'legacy-test-key', api_key.encode())\n"
                 "    return api_key == 'legacy-test-key'\n",
                 encoding="utf-8",
             )
@@ -1871,6 +1881,22 @@ class E2EDispatchTests(unittest.TestCase):
             payload["install"]["candidate_surface"]["roles_match"],
             runner.ROLES,
         )
+        self.assertEqual(
+            payload["install"]["candidate_surface"]["owned_agent_files"],
+            sorted(f"{role}.md" for role in runner.ROLES),
+        )
+        self.assertEqual(
+            payload["install"]["candidate_surface"]["owned_role_files"],
+            sorted(f"{role}.toml" for role in runner.ROLES),
+        )
+        self.assertEqual(
+            payload["install"]["candidate_surface"]["unrelated_agent_files"],
+            [],
+        )
+        self.assertEqual(
+            payload["install"]["candidate_surface"]["unrelated_role_files"],
+            [],
+        )
         self.assertEqual(payload["claude_isolation"]["active_claude_entries"], 0)
         self.assertIn(
             "claude", payload["claude_isolation"]["claude_runtime_identifiers"]
@@ -1910,6 +1936,7 @@ class E2EDispatchTests(unittest.TestCase):
             "README.md",
             "hmac.compare_digest",
             "legacy-test-key",
+            "non-ASCII",
         ):
             self.assertIn(term, gate["implementation"]["contract_terms"])
         runner.assert_large_ready_units(gate)

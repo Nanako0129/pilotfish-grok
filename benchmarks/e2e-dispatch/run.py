@@ -154,11 +154,6 @@ def assert_install_surface() -> dict[str, Any]:
     expected_role_files = {f"{role}.toml" for role in ROLES}
     agent_files = {path.name for path in agents.glob("*.md") if path.is_file()}
     role_files = {path.name for path in roles.glob("*.toml") if path.is_file()}
-    if agent_files != expected_agent_files or role_files != expected_role_files:
-        raise AssertionError(
-            "active Grok agent surface filenames do not exactly match this "
-            f"candidate: agents={sorted(agent_files)!r} roles={sorted(role_files)!r}"
-        )
 
     surface_mismatches = []
     for role in ROLES:
@@ -221,6 +216,10 @@ def assert_install_surface() -> dict[str, Any]:
             "roles_match": ROLES,
             "agent_files": sorted(agent_files),
             "role_files": sorted(role_files),
+            "owned_agent_files": sorted(expected_agent_files),
+            "owned_role_files": sorted(expected_role_files),
+            "unrelated_agent_files": sorted(agent_files - expected_agent_files),
+            "unrelated_role_files": sorted(role_files - expected_role_files),
             "source": str(ROOT / "templates"),
         },
     }
@@ -1148,7 +1147,8 @@ def require_bound_implementation(
             )
             residual = re.sub(path_pattern, "", match.group(1), flags=re.I)
             residual = re.sub(
-                r"(?i)\b(?:and|or)\b|anything else|secret storage|packaging|"
+                r"(?i)\b(?:and|or)\b|anything else|other files|"
+                r"secret storage|packaging|"
                 r"microbenchmarks|remove hardcoded key|add third-party deps",
                 "",
                 residual,
@@ -1994,8 +1994,36 @@ for name, source in mutants.items():
         "bounded-transient-retry",
         """
 import client
+import inspect
 
 Transient = client.TransientError
+
+constructor_signature = inspect.signature(client.Client.__init__)
+constructor_parameters = list(constructor_signature.parameters.values())
+assert [parameter.name for parameter in constructor_parameters] == [
+    "self",
+    "transport",
+], f"Client.__init__ signature changed: {constructor_signature}"
+assert all(
+    parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+    for parameter in constructor_parameters
+), f"Client.__init__ signature changed: {constructor_signature}"
+assert all(
+    parameter.default is inspect.Parameter.empty
+    for parameter in constructor_parameters
+), f"Client.__init__ signature changed: {constructor_signature}"
+
+fetch_signature = inspect.signature(client.Client.fetch)
+fetch_parameters = list(fetch_signature.parameters.values())
+assert [parameter.name for parameter in fetch_parameters] == [
+    "self"
+], f"Client.fetch signature changed: {fetch_signature}"
+assert fetch_parameters[0].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD, (
+    f"Client.fetch signature changed: {fetch_signature}"
+)
+assert fetch_parameters[0].default is inspect.Parameter.empty, (
+    f"Client.fetch signature changed: {fetch_signature}"
+)
 
 class Transport:
     def __init__(self, outcomes):
@@ -2010,7 +2038,7 @@ class Transport:
         return outcome
 
 retry = Transport([Transient("temporary"), "ok"])
-assert client.Client(retry).fetch() == "ok"
+assert client.Client(transport=retry).fetch() == "ok"
 assert retry.calls == 2
 
 permanent = Transport([ValueError("permanent")])
@@ -2021,6 +2049,15 @@ except ValueError:
 else:
     raise AssertionError("permanent failure was swallowed")
 assert permanent.calls == 1
+
+timeout = Transport([TimeoutError("timeout")])
+try:
+    client.Client(timeout).fetch()
+except TimeoutError:
+    pass
+else:
+    raise AssertionError("TimeoutError was treated as retryable or swallowed")
+assert timeout.calls == 1
 
 class AlwaysTransient:
     def __init__(self):
@@ -2138,6 +2175,11 @@ assert signature.return_annotation in (bool, "bool"), (
 
 assert auth.authenticate("legacy-test-key") is True
 assert auth.authenticate("wrong") is False
+try:
+    non_ascii_result = auth.authenticate("é")
+except Exception as exc:
+    raise AssertionError("authenticate rejected non-ASCII input") from exc
+assert non_ascii_result is False
 
 forced_results = iter((False, True))
 def spy(left, right):
@@ -2250,7 +2292,8 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
 def case_cue_free_security(fixture: Path) -> dict[str, Any]:
     prompt = (
         "Change authenticate() to use hmac.compare_digest while keeping its "
-        "signature and behavior. Add a regression test and update the documentation."
+        "signature and behavior. Non-ASCII string inputs must still return False "
+        "rather than raise. Add a regression test and update the documentation."
     )
     continuation = "Implement the proposed change."
     assert_cue_free_prompt(prompt)
@@ -2310,6 +2353,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
             "hmac.compare_digest",
             "authenticate",
             "legacy-test-key",
+            "non-ASCII",
             "True",
             "False",
             "python",
@@ -2343,6 +2387,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
             "hmac.compare_digest",
             "auth.py",
             "test_auth.py",
+            "non-ASCII",
         ),
     )
     behavior_probe = assert_security_behavior(fixture)

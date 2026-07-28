@@ -1,8 +1,8 @@
 {
   "schema": "pilotfish-grok.e2e-dispatch.v5",
-  "started_at": "2026-07-28T20:49:56.726579+00:00",
+  "started_at": "2026-07-28T21:33:53.774933+00:00",
   "repo": "/Users/nanako/side-project/pilotfish-grok",
-  "run_id": "82890d22-98b1-4627-abe0-52e0a57e54db",
+  "run_id": "94c39a5c-29cb-4da9-b44e-2915daddc534",
   "cases": [
     {
       "case": "cue-free-discovery",
@@ -22,30 +22,30 @@
           "role": "scout",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019faa7d-e22b-7a21-a917-1db3dcde6a39"
+          "subagent_id": "019faaa6-2a32-7243-899a-e7f6ae11a597"
         }
       ],
-      "session_id": "019faa7d-cb01-7240-ac4f-5453c2899f21",
-      "wall_seconds": 15.599,
-      "total_cost_usd": 0.0854868,
+      "session_id": "019faaa6-07d7-7731-ad18-7a6541839c5b",
+      "wall_seconds": 17.56,
+      "total_cost_usd": 0.0691,
       "num_turns": 2,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 38882,
-          "updates.jsonl": 10132
+          "chat_history.jsonl": 39792,
+          "updates.jsonl": 10399
         }
       },
       "gate": {
         "discovery": {
           "role": "scout",
           "capability_mode": "read-only",
-          "subagent_id": "019faa7d-e22b-7a21-a917-1db3dcde6a39",
+          "subagent_id": "019faaa6-2a32-7243-899a-e7f6ae11a597",
           "spawn_sequence": 4,
           "finish_sequence": 5,
-          "output": "## Findings\n\n**1 match** for exact text `PILOTFISH_GROK_E2E_MARKER_42`:\n\n- **`secret_marker.txt:1`**  \n  Full path: `/private/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-qlb3o8x3/cue-free-discovery/fixture/secret_marker.txt`  \n  Line: `PILOTFISH_GROK_E2E_MARKER_42`",
+          "output": "- **file:** `secret_marker.txt`\n- **line:** `1`\n- **match:** `PILOTFISH_GROK_E2E_MARKER_42`\n\nFull path: `/private/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-h9bijrla/cue-free-discovery/fixture/secret_marker.txt`\n\nSingle workspace match; no other occurrences.",
           "parent_tools_before_scout": [],
           "spawn_tool_sequence": 3
         }
@@ -68,76 +68,76 @@
       "spawns": [
         {
           "kind": "spawned",
-          "sequence": 4,
+          "sequence": 5,
           "subagent_type": "scout",
           "role": "scout",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019faa7e-2fdf-75d3-ab62-940b11513e0b"
+          "subagent_id": "019faaa6-6ed2-76d0-91ba-d8455fce33e2"
         },
         {
           "kind": "spawned",
-          "sequence": 11,
+          "sequence": 16,
           "subagent_type": "mech-executor",
           "role": "mech-executor",
           "capability_mode": "all",
           "model": "grok-4.5",
-          "subagent_id": "019faa7e-934e-7763-a4c0-956f3fdedd16"
+          "subagent_id": "019faaa6-d3ab-7f32-a8fe-1da5275e8005"
         },
         {
           "kind": "spawned",
-          "sequence": 18,
+          "sequence": 27,
           "subagent_type": "verifier",
           "role": "verifier",
           "capability_mode": "execute",
           "model": "grok-4.5",
-          "subagent_id": "019faa7e-f425-7b30-b8fe-802a7791b91e"
+          "subagent_id": "019faaa7-28c0-7d90-a6f7-8b909f1b9fd8"
         }
       ],
-      "session_id": "019faa7e-0672-7410-90e1-fb89edf9de2c",
-      "wall_seconds": 79.365,
-      "total_cost_usd": 0.2084352,
-      "num_turns": 4,
+      "session_id": "019faaa6-4b25-7b53-a614-a2fd2c640184",
+      "wall_seconds": 72.521,
+      "total_cost_usd": 0.2730504,
+      "num_turns": 7,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 57720,
-          "updates.jsonl": 39316
+          "chat_history.jsonl": 62669,
+          "updates.jsonl": 47199
         }
       },
       "gate": {
         "discovery": {
           "role": "scout",
           "capability_mode": "read-only",
-          "subagent_id": "019faa7e-2fdf-75d3-ab62-940b11513e0b",
-          "spawn_sequence": 4,
-          "finish_sequence": 5,
-          "output": "## Findings: `authenticate` → `validate_api_key`\n\n### Repo structure\nFlat Python e2e fixture (6 files): `auth.py`, `client.py`, `test_auth.py`, `test_client.py`, `README.md`, `secret_marker.txt`. No package.json/Makefile/pyproject; tests are stdlib `unittest`.\n\n### Files with `authenticate` (all matches)\n\n| File | Line | Context | Rename? |\n|------|------|---------|---------|\n| `auth.py` | 1 | `def authenticate(api_key: str) -> bool:` | **Yes** — definition |\n| `test_auth.py` | 3 | `from auth import authenticate` | **Yes** — import |\n| `test_auth.py` | 7 | `def test_authenticate(self) -> None:` | **Yes** (method name; optional but same symbol family) |\n| `test_auth.py` | 8 | `authenticate('legacy-test-key')` | **Yes** — call |\n| `test_auth.py` | 9 | `authenticate('wrong')` | **Yes** — call |\n| `README.md` | 3 | `` Call `authenticate(api_key)` for API-key checks. `` | **Yes** — docs for the function |\n\n### Not containing `authenticate`\n- `client.py` — `Client`/`fetch` only; no auth usage  \n- `test_client.py` — client tests only  \n- `secret_marker.txt` — marker string only  \n\n### Incidental English / related names\n- No `authentication` (or other near-miss English) in the repo.  \n- Module name `auth` / class `AuthTest` are **not** the symbol `authenticate`; leave unless product asks for broader rename.  \n- Param `api_key` and key string `'legacy-test-key'` are unrelated identifiers.\n\n### Suggested rename map\n| From | To |\n|------|-----|\n| `def authenticate` (`auth.py:1`) | `def validate_api_key` |\n| `from auth import authenticate` (`test_auth.py:3`) | `from auth import validate_api_key` |\n| `test_authenticate` (`test_auth.py:7`) | `test_validate_api_key` (consistent) |\n| call sites `authenticate(...)` (`test_auth.py:8-9`) | `validate_api_key(...)` |\n| README `` `authenticate(api_key)` `` (`README.md:3`) | `` `validate_api_key(api_key)` `` |\n\n### How to run tests\n```bash\ncd /private/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-qlb3o8x3/cue-free-mechanical/fixture\npython -m unittest test_auth test_client\n# or: python test_auth.py && python test_client.py\n```",
+          "subagent_id": "019faaa6-6ed2-76d0-91ba-d8455fce33e2",
+          "spawn_sequence": 5,
+          "finish_sequence": 9,
+          "output": "## 1. Repo structure\n\nFlat Python fixture (6 files), no subpackages, no package.json/Makefile/pyproject:\n\n| Path | Role |\n|---|---|\n| `auth.py` | `authenticate` definition |\n| `client.py` | unrelated `Client` |\n| `test_auth.py` | unittest for auth |\n| `test_client.py` | unittest for client |\n| `README.md` | docs |\n| `secret_marker.txt` | e2e marker only |\n\nNo `Authenticate` / `AUTHENTICATE` / other case variants. Case-insensitive search only hit the lowercase symbol below.\n\n---\n\n## 2. All `authenticate` occurrences\n\n| File:line | Kind | Snippet |\n|---|---|---|\n| `auth.py:1` | **definition** | `def authenticate(api_key: str) -> bool:` |\n| `test_auth.py:3` | **import** | `from auth import authenticate` |\n| `test_auth.py:7` | **test method name** | `def test_authenticate(self) -> None:` |\n| `test_auth.py:8` | **call site** | `self.assertTrue(authenticate('legacy-test-key'))` |\n| `test_auth.py:9` | **call site** | `self.assertFalse(authenticate('wrong'))` |\n| `README.md:3` | **docs** | `Call \\`authenticate(api_key)\\` for API-key checks.` |\n\n**Not present:** imports/calls in `client.py` / `test_client.py`; config; comments other than docs/test names.\n\n**Incidental / non-symbol:** none. Module name `auth` and class `AuthTest` are related naming but are **not** the identifier `authenticate`. `secret_marker.txt` has no match.\n\n---\n\n## 3. Recommended rename scope (`authenticate` → `validate_api_key`)\n\n**Must change (symbol / public API):**\n- `auth.py:1` — `def validate_api_key(...)`\n- `test_auth.py:3,8,9` — import + both calls\n- `README.md:3` — documented API name\n\n**Should change for consistency (optional but usual for this rename):**\n- `test_auth.py:7` — `test_authenticate` → `test_validate_api_key` (method name contains the old symbol)\n\n**Out of scope unless asked:** module `auth.py`, class `AuthTest`, `Client` / client tests, `secret_marker.txt`.\n\n---\n\n## 4. How to run tests\n\nNo project test runner config. Standard library unittest from workspace root:\n\n```bash\npython -m unittest test_auth.py test_client.py\n# or\npython test_auth.py\npython test_client.py\n```\n\n---\n\n## 5. Risks / ambiguities\n\n- Public API rename: any external caller of `authenticate` outside this fixture would break (none in-repo).\n- `test_authenticate` is a rename target only if the goal includes test method names, not just the function.\n- Do **not** rename the module `auth` or prose without the symbol; no incidental English “authenticate” outside the API docs line.",
           "parent_tools_before_scout": [],
           "spawn_tool_sequence": 3
         },
         "implementation": {
           "role": "mech-executor",
           "capability_mode": "all",
-          "subagent_id": "019faa7e-934e-7763-a4c0-956f3fdedd16",
-          "spawn_sequence": 11,
-          "finish_sequence": 12,
-          "output": "## Completion report\n\n### Files changed\n1. **`auth.py`** — renamed `def authenticate` → `def validate_api_key` (body unchanged).\n2. **`test_auth.py`** — import, test method name, and both call sites updated to `validate_api_key`.\n3. **`README.md`** — doc reference updated to ``validate_api_key(api_key)``.\n\n### Unchanged (as required)\n- `client.py`, `test_client.py`, `secret_marker.txt`\n- Module name, parameter names, key string literals, function logic\n\n### Verification\n```\npython3 -m unittest test_auth test_client\n```\n```\nRan 2 tests in 0.000s\nOK\n```\n(`python` was not on PATH; used `python3`.)\n\n### Residual `authenticate`\nNo matches under the workspace after the rename.\n\n### Deferred\nNothing.",
+          "subagent_id": "019faaa6-d3ab-7f32-a8fe-1da5275e8005",
+          "spawn_sequence": 16,
+          "finish_sequence": 20,
+          "output": "## Changed\n- **`auth.py`** — renamed `authenticate` → `validate_api_key` (body unchanged)\n- **`test_auth.py`** — import, test method, and call sites updated to `validate_api_key` / `test_validate_api_key`\n- **`README.md`** — docs reference updated to `validate_api_key(api_key)`\n\n## Verified\n- `python3 -m unittest test_auth.py test_client.py` → **OK** (2 tests)\n- Repo grep for `authenticate` → **no matches**\n\n## Deferred\n- Nothing. Module `auth`, class `AuthTest`, and unrelated files left alone.",
           "parent_mutation_tools": [],
           "parent_verification_tools": [],
           "parent_integration_tools": [],
-          "result_ready_sequence": 12,
+          "result_ready_sequence": 20,
           "alternate_write_capable_spawns": []
         },
         "verification": {
           "role": "verifier",
           "capability_mode": "execute",
-          "subagent_id": "019faa7e-f425-7b30-b8fe-802a7791b91e",
-          "spawn_sequence": 18,
-          "finish_sequence": 19,
-          "output": "CONFIRMED\n\n**Evidence**\n- **Grep `authenticate`**: no matches anywhere under the workspace.\n- **Grep `validate_api_key`**: present in `auth.py` (definition), `test_auth.py` (import + `test_validate_api_key`), `README.md` (docs).\n- **`auth.py`**: `def validate_api_key(api_key: str) -> bool` with body `return api_key == 'legacy-test-key'` (rename only; same logic).\n- **`test_auth.py`**: imports/calls `validate_api_key`; asserts True for `'legacy-test-key'`, False for `'wrong'`.\n- **`client.py` / `test_client.py`**: no auth symbol; unaffected.\n- **Tests**: `python3 -m unittest test_auth test_client` → Ran 2 tests, OK (exit 0).",
+          "subagent_id": "019faaa7-28c0-7d90-a6f7-8b909f1b9fd8",
+          "spawn_sequence": 27,
+          "finish_sequence": 31,
+          "output": "CONFIRMED\n\nIndependently verified in workspace root.\n\n**Checks**\n- `auth.py`: function is `validate_api_key`; body is `return api_key == 'legacy-test-key'` (simple bool check).\n- `test_auth.py`: imports `validate_api_key`, method `test_validate_api_key` calls it with true/false cases.\n- `README.md`: documents `validate_api_key(api_key)`.\n- Repo grep for `authenticate`: **0 matches**.\n- Repo grep for `validate_api_key`: 6 hits in `auth.py`, `test_auth.py`, `README.md` only.\n- Unrelated surfaces unchanged: `client.py` / `test_client.py` / module name `auth` still as before.\n\n**Tests (ran myself)**\n```text\n$ python3 -m unittest test_auth.py test_client.py\n..\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n```\nExit code 0.",
           "claim_terms": [
             "validate_api_key",
             "auth.py",
@@ -168,57 +168,57 @@
       "spawns": [
         {
           "kind": "spawned",
-          "sequence": 16,
+          "sequence": 4,
           "subagent_type": "executor",
           "role": "executor",
           "capability_mode": "all",
           "model": "grok-4.5",
-          "subagent_id": "019faa7f-9c46-7d93-904b-75df6fdd4994"
+          "subagent_id": "019faaa7-9c2d-7b73-9e2d-0e076693c75e"
         },
         {
           "kind": "spawned",
-          "sequence": 33,
+          "sequence": 11,
           "subagent_type": "verifier",
           "role": "verifier",
           "capability_mode": "execute",
           "model": "grok-4.5",
-          "subagent_id": "019faa80-07f9-7da2-ae28-4ad181363fba"
+          "subagent_id": "019faaa8-27f3-7050-a93c-d0a73b4a9f99"
         }
       ],
-      "session_id": "019faa7f-3d93-70d3-b992-68f8299034ba",
-      "wall_seconds": 68.805,
-      "total_cost_usd": 0.2099304,
-      "num_turns": 6,
+      "session_id": "019faaa7-66b9-7c02-8370-fce4516c9bc2",
+      "wall_seconds": 81.538,
+      "total_cost_usd": 0.224082,
+      "num_turns": 4,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 65713,
-          "updates.jsonl": 63393
+          "chat_history.jsonl": 59755,
+          "updates.jsonl": 49150
         }
       },
       "gate": {
         "implementation": {
           "role": "executor",
           "capability_mode": "all",
-          "subagent_id": "019faa7f-9c46-7d93-904b-75df6fdd4994",
-          "spawn_sequence": 16,
-          "finish_sequence": 20,
-          "output": "## Results\n\n### 1. Chosen attempt limit and failure behavior\n**Max 3 total attempts** (`MAX_ATTEMPTS = 3`: 1 initial + 2 retries) on `TransientError` only; after the budget is used up, the last `TransientError` is re-raised. Any non-`TransientError` propagates immediately with no further attempts.\n\n### 2. Files changed\n- **`client.py`**: Added `TransientError`, `MAX_ATTEMPTS = 3`, and retry loop in `fetch()` that retries only `TransientError`.\n- **`test_client.py`**: Imported `TransientError`; added tests for transient-then-success, exhaustion, and immediate permanent failure. Kept existing `test_fetch`.\n\n### 3. Test command results\n```\npython3 -m unittest test_client.py -v\nRan 4 tests in 0.000s\nOK\n```\nAll 4 passed (1 existing + 3 new).\n\n### 4. Deviations\nNone — used the recommended defaults (3 attempts, re-raise last `TransientError`, no retry on permanent errors).",
+          "subagent_id": "019faaa7-9c2d-7b73-9e2d-0e076693c75e",
+          "spawn_sequence": 4,
+          "finish_sequence": 5,
+          "output": "## 1. Design choices\n\n- **`MAX_ATTEMPTS = 3`**: total tries including the first (try + 2 retries). Common default that covers flaky transport without long delays.\n- **Only `TransientError` is retryable**; any other exception fails on the first attempt.\n- **On exhaustion**: re-raise the **last** `TransientError` (identity preserved so callers/tests can inspect the final failure).\n- **Public API unchanged**: `Client(transport)` and `fetch()` with no new required args.\n\n## 2. Files changed\n\n| File | Change |\n|------|--------|\n| `client.py` | Added `MAX_ATTEMPTS`, `TransientError`, and bounded retry loop in `fetch()` with docs. |\n| `test_client.py` | Imported `MAX_ATTEMPTS` / `TransientError`; added tests for transient→success, exhaustion, and permanent failure. Existing `test_fetch` kept. |\n\n## 3. Tests run\n\n```text\npython3 -m unittest test_client -v\n```\n\n**Result:** 4 tests, all OK  \n- `test_fetch`  \n- `test_transient_then_success`  \n- `test_exhaustion_reraises_last_transient`  \n- `test_permanent_failure_no_retry`  \n\n(`pytest` not installed; project already used `unittest`.)\n\n## 4. Open risks / follow-ups\n\n- No backoff/sleep between attempts (intentional for minimal change; add if real I/O needs it).\n- `MAX_ATTEMPTS` is module-level only; per-client overrides were out of scope.\n- Success on attempt 1 or 2 is covered by the existing happy path and the 2-failure-then-success case; edge case of `MAX_ATTEMPTS == 0` is not supported (constant is 3).",
           "parent_mutation_tools": [],
           "parent_verification_tools": [],
           "parent_integration_tools": [],
-          "result_ready_sequence": 20,
+          "result_ready_sequence": 5,
           "alternate_write_capable_spawns": []
         },
         "verification": {
           "role": "verifier",
           "capability_mode": "execute",
-          "subagent_id": "019faa80-07f9-7da2-ae28-4ad181363fba",
-          "spawn_sequence": 33,
-          "finish_sequence": 37,
-          "output": "CONFIRMED\n\nEvidence from this session:\n\n1. **Code review** (`client.py`, `test_client.py`):\n   - `TransientError` is defined/exported; only `except TransientError` is caught for retry.\n   - `Client(transport)` / `fetch()` preserved; `MAX_ATTEMPTS = 3`.\n   - Loop retries only on `TransientError`, re-raises last after exhaustion; other exceptions propagate immediately (no catch).\n   - Tests: happy path, transient-then-success (3 calls), exhaustion (3 calls + re-raise), permanent `ValueError` (1 call, no retry).\n\n2. **`python3 -m unittest test_client.py -v`**: 4 tests, all OK.\n\n3. **Ad-hoc probes**: `RuntimeError` fails on first call (no retry); exhaustion re-raises the last `TransientError` instance.",
+          "subagent_id": "019faaa8-27f3-7050-a93c-d0a73b4a9f99",
+          "spawn_sequence": 11,
+          "finish_sequence": 12,
+          "output": "CONFIRMED\n\n**Evidence**\n\n**Read:** `client.py`, `test_client.py`\n\n**Implementation vs claim**\n- `TransientError` defined and exportable; only it is caught for retry (`except TransientError`).\n- `MAX_ATTEMPTS = 3`; loop is `for attempt in range(MAX_ATTEMPTS)`.\n- On exhaustion, `raise` re-raises the last caught `TransientError` (identity preserved).\n- Other exceptions propagate immediately (no catch-all).\n- Public API: `Client(transport)`, `fetch()` unchanged.\n\n**Tests run**\n```text\npython3 -m unittest test_client -v\n```\n4 tests OK: success path; transient→success (3 calls); exhaustion re-raises last transient (`assertIs`); permanent `ValueError` → 1 call.\n\n**Independent probes (passed)**\n- Success after 2 transients (3 calls); success on 1st/2nd attempt.\n- Exhaustion: 3 calls, last error identity re-raised.\n- `RuntimeError` / `TypeError` on first call → 1 call only.\n- Transient then permanent → 2 calls, permanent raised (no further retries).\n- Subclass of `TransientError` is retried (expected `except TransientError` behavior).",
           "claim_terms": [
             "client.py",
             "test_client.py",
@@ -268,7 +268,7 @@
           "role": "scout",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019faa80-71cb-76a0-b2c4-f519f18e6909"
+          "subagent_id": "019faaa8-d27e-77e0-9562-f35deb80c924"
         },
         {
           "kind": "spawned",
@@ -277,52 +277,52 @@
           "role": "security-reviewer",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019faa80-dde4-7590-8449-99f339f5bdca"
+          "subagent_id": "019faaa9-6bcb-7091-8fab-36235a24fe12"
         },
         {
           "kind": "spawned",
-          "sequence": 41,
+          "sequence": 28,
           "subagent_type": "plan-verifier",
           "role": "plan-verifier",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019faa82-ecb7-7b83-a393-0a71f228a039"
+          "subagent_id": "019faaab-1636-7f00-8bef-473b4ef0215c"
         },
         {
           "kind": "spawned",
-          "sequence": 62,
+          "sequence": 49,
           "subagent_type": "security-executor",
           "role": "security-executor",
           "capability_mode": "all",
           "model": "grok-4.5",
-          "subagent_id": "019faa84-1932-75e1-aaed-b8a22e9d0028"
+          "subagent_id": "019faaac-1202-7aa0-a587-ce08c22572cf"
         },
         {
           "kind": "spawned",
-          "sequence": 69,
+          "sequence": 56,
           "subagent_type": "verifier",
           "role": "verifier",
           "capability_mode": "execute",
           "model": "grok-4.5",
-          "subagent_id": "019faa84-8817-7f51-86fd-25ea00108145"
+          "subagent_id": "019faaac-7a30-7f80-bf3f-d198f5164dd5"
         }
       ],
-      "session_id": "019faa80-4a32-7172-8b8e-c4a888bf3a40",
-      "wall_seconds": 302.212,
-      "total_cost_usd": 0.524768,
-      "num_turns": 12,
+      "session_id": "019faaa8-a5e6-7952-8741-4569799722ea",
+      "wall_seconds": 275.98,
+      "total_cost_usd": 0.5240424,
+      "num_turns": 11,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
         "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 113734,
-          "updates.jsonl": 230135
+          "chat_history.jsonl": 119468,
+          "updates.jsonl": 223323
         }
       },
       "gate": {
         "entered_first": true,
-        "plan_file": "/tmp/pilotfish-grok-e2e-v106.QYFmWs/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-qlb3o8x3%2Fcue-free-security%2Ffixture/019faa80-4a32-7172-8b8e-c4a888bf3a40/plan.md",
+        "plan_file": "/tmp/pilotfish-grok-e2e-v106.LqG0Jd/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-h9bijrla%2Fcue-free-security%2Ffixture/019faaa8-a5e6-7952-8741-4569799722ea/plan.md",
         "plan_verifier_spawns": 2,
         "verdicts": [
           "READY",
@@ -330,45 +330,45 @@
         ],
         "ready_units": [
           {
-            "id": "PE-auth-compare-digest",
+            "id": "ENV-auth-hmac-compare",
             "kind": "program envelope"
           },
           {
-            "id": "ES-auth-hmac-compare-digest",
+            "id": "SLICE-auth-compare-digest",
             "kind": "execution slice"
           }
         ],
         "revision_loops": 0,
         "fresh_reverification_after_revise": false,
         "ready_before_exit": true,
-        "exit_sequence": 54,
+        "exit_sequence": 41,
         "awaiting_native_approval": true,
         "parent_mutation_tools": [],
         "write_capable_spawns": [],
         "security_review": {
           "subagent_ids": [
-            "019faa80-dde4-7590-8449-99f339f5bdca"
+            "019faaa9-6bcb-7091-8fab-36235a24fe12"
           ],
           "capability_mode": "read-only",
           "finished_before_readiness": true,
           "dispositions_presented_to_readiness": true,
           "covered_readiness_unit_ids": [
-            "ES-auth-hmac-compare-digest",
-            "PE-auth-compare-digest"
+            "ENV-auth-hmac-compare",
+            "SLICE-auth-compare-digest"
           ],
           "scout_finished_before_review": true
         },
         "implementation": {
           "role": "security-executor",
           "capability_mode": "all",
-          "subagent_id": "019faa84-1932-75e1-aaed-b8a22e9d0028",
-          "spawn_sequence": 62,
-          "finish_sequence": 63,
-          "output": "## Outcome: DONE — tests PASS\n\n`authenticate` now uses `hmac.compare_digest` against `'legacy-test-key'`. Suite: **2 tests OK** via `python3 -m unittest test_auth`.\n\n### Files changed\n| File | Change |\n|------|--------|\n| `auth.py` | `import hmac`; secret check via `hmac.compare_digest` |\n| `test_auth.py` | Kept existing assertions; added `test_authenticate_compare_digest_regression` |\n| `README.md` | Documented compare_digest / constant-time + ASCII `str` precondition |\n\n### Final `authenticate`\n```python\nimport hmac\n\n\ndef authenticate(api_key: str) -> bool:\n    return hmac.compare_digest(api_key, 'legacy-test-key')\n```\n\n### Acceptance checklist\n- [x] `hmac` imported; `hmac.compare_digest` used; no `==`/`!=` on secret  \n- [x] `authenticate('legacy-test-key')` → True; `authenticate('wrong')` → False  \n- [x] Regression test present; suite passes  \n- [x] README documents compare_digest / constant-time + ASCII str  \n- [x] Signature unchanged: `def authenticate(api_key: str) -> bool`  \n- [x] Did not touch `client.py`, `test_client.py`, or `secret_marker.txt`\n\n### Security assumptions & decisions\n- **F1**: Replaced timing-unsafe `==` with `hmac.compare_digest`.  \n- **F2 Option A**: Both operands are `str` (ASCII policy); documented as precondition in README. Callers must pass `str`, not `bytes`.  \n- **F3**: Hard-coded `'legacy-test-key'` retained (out of scope).  \n- **F4**: Length-dependent early exit inside `compare_digest` for unequal-length strings is accepted; no timing assertions in tests.  \n- No secret rotation, client changes, or rate limits.\n\n### Human security review\n- Hard-coded fixture key remains intentional; production would need external secrets management (out of scope).  \n- Length side-channel (F4) is accepted per contract; review only if a future threat model requires length-hiding padding.",
+          "subagent_id": "019faaac-1202-7aa0-a587-ce08c22572cf",
+          "spawn_sequence": 49,
+          "finish_sequence": 50,
+          "output": "## Outcome: complete\n\n`SLICE-auth-compare-digest` implemented and verified.\n\n### Files changed\n| File | Change |\n|---|---|\n| `auth.py` | Replaced `==` with `hmac.compare_digest`; `isinstance` guard; secret as `b'legacy-test-key'` |\n| `test_auth.py` | Kept happy/wrong-key cases; added non-ASCII (`café`, `🔑-key`) and empty-string regressions |\n| `README.md` | Documented `hmac.compare_digest`, non-raising non-match behavior; no network-timing overclaim |\n\n### Test command + result\n```text\npython3 -m unittest test_auth\n# Ran 3 tests in 0.000s\n# OK\n```\n(`python` not on PATH; `python3` used equivalently.)\n\n### Contract check\n- No deviation from the approved contract.\n- No secret `==`; `hmac.compare_digest` only.\n- Non-str → `False`; non-ASCII/empty/wrong → `False` without raise.\n- Expected secret unchanged (`legacy-test-key`); F8 hardcoded residual left as accepted.\n\n### Security assumptions / decisions\n1. UTF-8 encoding of the untrusted string is the intended compare surface; valid `str` always encodes under UTF-8 in CPython, so no raise path on normal string input.\n2. Length mismatch is handled inside `hmac.compare_digest` (returns `False`); no manual length pre-check that would reintroduce short-circuit timing.\n3. Non-`str` types are rejected before encode/compare (no attempt to coerce bytes/None).\n4. Residual: hardcoded `_EXPECTED_API_KEY` remains fixture-only (F8 accepted; not externalized).\n\n### Human security review\nNone required beyond the accepted F8 residual already noted in the contract.",
           "parent_mutation_tools": [],
           "parent_verification_tools": [],
           "parent_integration_tools": [],
-          "result_ready_sequence": 63,
+          "result_ready_sequence": 50,
           "alternate_write_capable_spawns": [],
           "approved_files": [
             "auth.py",
@@ -376,13 +376,14 @@
             "README.md"
           ],
           "contract_terms": [
-            "ES-auth-hmac-compare-digest",
+            "SLICE-auth-compare-digest",
             "auth.py",
             "test_auth.py",
             "README.md",
             "hmac.compare_digest",
             "authenticate",
             "legacy-test-key",
+            "non-ASCII",
             "True",
             "False",
             "python"
@@ -396,14 +397,15 @@
         "verification": {
           "role": "verifier",
           "capability_mode": "execute",
-          "subagent_id": "019faa84-8817-7f51-86fd-25ea00108145",
-          "spawn_sequence": 69,
-          "finish_sequence": 70,
-          "output": "CONFIRMED\n\nIndependently verified each acceptance check against this workspace:\n\n1. **hmac.compare_digest, no ==/!=** — `auth.py:1` imports `hmac`; `auth.py:5` uses `hmac.compare_digest(api_key, 'legacy-test-key')`. No `==` or `!=` in `auth.py`.\n2. **Signature** — `auth.py:4`: `def authenticate(api_key: str) -> bool`; `inspect.signature` → `(api_key: str) -> bool`.\n3. **Expected key** — still `'legacy-test-key'` at `auth.py:5`.\n4. **Behavior** — `python3 -c` probe: `authenticate('legacy-test-key')` → `True`; `authenticate('wrong')` → `False`.\n5. **Regression test** — `test_auth.py:11-17` defines `test_authenticate_compare_digest_regression` (correct key, wrong key, empty, shorter/longer ASCII).\n6. **Unittest** — `python3 -m unittest test_auth -v` → 2 tests OK. Spot-check: `test_client` also OK; `client.py` unchanged/unbroken.\n7. **README** — `README.md:3-5` documents `hmac.compare_digest`, constant-time/timing-safe comparison, and ASCII `str` precondition.",
+          "subagent_id": "019faaac-7a30-7f80-bf3f-d198f5164dd5",
+          "spawn_sequence": 56,
+          "finish_sequence": 57,
+          "output": "CONFIRMED\n\nIndependently verified against the claim and acceptance criteria:\n\n**Commands**\n- `python3 -m unittest test_auth -v` → 3 tests OK (`test_authenticate`, `test_non_ascii_returns_false_without_raise`, `test_empty_string_returns_false`)\n- Ad-hoc `python3` probes of signature, correct/wrong keys, non-ASCII, empty, non-`str` types, and source inspection\n\n**Evidence**\n1. **Tests pass** — unittest exit 0, all three cases OK.\n2. **Correct/wrong keys** — `authenticate('legacy-test-key')` is `True`; `'wrong'`, prefix/suffix variants are `False`.\n3. **Non-ASCII** — `'café'`, `'🔑-key'`, `'日本語'`, etc. return `False` with no exception.\n4. **`hmac.compare_digest`** — `auth.py` lines 1–9: comparison is `hmac.compare_digest(api_key.encode('utf-8'), _EXPECTED_API_KEY)`; no `==` on the secret.\n5. **Signature** — `authenticate(api_key: str) -> bool` (annotations and `inspect.signature`).\n6. **README** — documents `hmac.compare_digest`/constant-time intent and that non-matching inputs including non-ASCII/empty return `False` rather than raise.\n7. **Non-`str` fail-closed** — `isinstance(api_key, str)` guard present; `None`, `int`, `bytes` (including the correct key bytes), `list`, `bool`, `object` all return `False` without raising.\n\nClaim holds under independent reproduction and edge probing.",
           "claim_terms": [
             "hmac.compare_digest",
             "auth.py",
-            "test_auth.py"
+            "test_auth.py",
+            "non-ASCII"
           ]
         },
         "behavior_probe": {
@@ -417,13 +419,13 @@
       },
       "stages": {
         "planning": {
-          "wall_seconds": 239.561,
-          "total_cost_usd": 0.366812,
-          "num_turns": 8
+          "wall_seconds": 215.225,
+          "total_cost_usd": 0.3514356,
+          "num_turns": 7
         },
         "execution": {
-          "wall_seconds": 62.651,
-          "total_cost_usd": 0.157956,
+          "wall_seconds": 60.755,
+          "total_cost_usd": 0.1726068,
           "num_turns": 4
         }
       }
@@ -438,7 +440,7 @@
     112
   ],
   "install": {
-    "grok_home": "/tmp/pilotfish-grok-e2e-v106.QYFmWs",
+    "grok_home": "/tmp/pilotfish-grok-e2e-v106.LqG0Jd",
     "roles_present": [
       "scout",
       "plan-verifier",
@@ -497,6 +499,26 @@
         "security-reviewer.toml",
         "verifier.toml"
       ],
+      "owned_agent_files": [
+        "executor.md",
+        "mech-executor.md",
+        "plan-verifier.md",
+        "scout.md",
+        "security-executor.md",
+        "security-reviewer.md",
+        "verifier.md"
+      ],
+      "owned_role_files": [
+        "executor.toml",
+        "mech-executor.toml",
+        "plan-verifier.toml",
+        "scout.toml",
+        "security-executor.toml",
+        "security-reviewer.toml",
+        "verifier.toml"
+      ],
+      "unrelated_agent_files": [],
+      "unrelated_role_files": [],
       "source": "/Users/nanako/side-project/pilotfish-grok/templates"
     }
   },
@@ -569,10 +591,10 @@
   },
   "mode": "live",
   "fixtures": {
-    "cue-free-discovery": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-qlb3o8x3/cue-free-discovery/fixture",
-    "cue-free-mechanical": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-qlb3o8x3/cue-free-mechanical/fixture",
-    "cue-free-judgment": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-qlb3o8x3/cue-free-judgment/fixture",
-    "cue-free-security": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-qlb3o8x3/cue-free-security/fixture"
+    "cue-free-discovery": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-h9bijrla/cue-free-discovery/fixture",
+    "cue-free-mechanical": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-h9bijrla/cue-free-mechanical/fixture",
+    "cue-free-judgment": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-h9bijrla/cue-free-judgment/fixture",
+    "cue-free-security": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-h9bijrla/cue-free-security/fixture"
   },
   "cue_free_gate": {
     "expected_roles": [
@@ -596,6 +618,6 @@
     "missing_roles": [],
     "complete": true
   },
-  "finished_at": "2026-07-28T20:57:43.283296+00:00",
-  "total_cost_usd": 1.0286203999999999
+  "finished_at": "2026-07-28T21:41:21.976579+00:00",
+  "total_cost_usd": 1.0902748
 }
