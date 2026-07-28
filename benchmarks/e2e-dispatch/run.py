@@ -783,8 +783,12 @@ def require_role_owned_implementation(
         if exclusive
         and event.get("kind") == "spawned"
         and event.get("sequence", -1) > (after_sequence or -1)
-        and event.get("capability_mode") == "all"
+        and event.get("capability_mode") in {"all", "execute"}
         and event.get("subagent_type") != role
+        and (
+            event.get("capability_mode") == "all"
+            or event.get("sequence", -1) < implementation["finish_sequence"]
+        )
     ]
     if alternate_executors:
         raise AssertionError(
@@ -988,13 +992,7 @@ def is_repository_discovery_tool(event: dict[str, Any]) -> bool:
         return True
     if tool != "run_terminal_command":
         return False
-    raw_input = event.get("raw_input")
-    command = raw_input.get("command") if isinstance(raw_input, dict) else None
-    return isinstance(command, str) and re.search(
-        r"(?i)(?:^|[;&|]\s*)(?:\S*/)?(?:rg|grep|find|ls|cat|sed)\b"
-        r"|\bgit\s+(?:grep|ls-files|show)\b",
-        command,
-    ) is not None
+    return not is_unittest_command(event.get("raw_input"))
 
 
 def require_scout_before_parent_tools(
@@ -1656,6 +1654,7 @@ def assert_security_behavior(fixture: Path) -> dict[str, Any]:
         "compare-digest-authentication",
         """
 import auth
+import inspect
 
 calls = []
 def normalized(value):
@@ -1672,17 +1671,43 @@ elif hasattr(auth, "compare_digest"):
 else:
     raise AssertionError("compare_digest is not reachable from auth")
 
+signature = inspect.signature(auth.authenticate)
+parameters = list(signature.parameters.values())
+assert len(parameters) == 1, f"authenticate signature changed: {signature}"
+parameter = parameters[0]
+assert parameter.name == "api_key", f"authenticate signature changed: {signature}"
+assert parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD, (
+    f"authenticate signature changed: {signature}"
+)
+assert parameter.default is inspect.Parameter.empty, (
+    f"authenticate signature changed: {signature}"
+)
+assert parameter.annotation in (str, "str"), (
+    f"authenticate signature changed: {signature}"
+)
+assert signature.return_annotation in (bool, "bool"), (
+    f"authenticate signature changed: {signature}"
+)
+
+assert auth.authenticate("legacy-test-key") is True
+assert auth.authenticate("wrong") is False
+
+forced_results = iter((False, True))
 def spy(left, right):
     calls.append((normalized(left), normalized(right)))
-    return original(left, right)
+    return next(forced_results)
 
 if hasattr(auth, "hmac"):
     auth.hmac.compare_digest = spy
 else:
     auth.compare_digest = spy
 
-assert auth.authenticate("legacy-test-key") is True
-assert auth.authenticate("wrong") is False
+assert auth.authenticate("legacy-test-key") is False, (
+    "authenticate ignored compare_digest's false result"
+)
+assert auth.authenticate("wrong") is True, (
+    "authenticate ignored compare_digest's true result"
+)
 assert len(calls) == 2
 for actual, candidate in zip(calls, ("legacy-test-key", "wrong")):
     assert actual in (

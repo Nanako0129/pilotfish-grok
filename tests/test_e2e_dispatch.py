@@ -286,7 +286,7 @@ class E2EDispatchTests(unittest.TestCase):
                 "kind": "spawned",
                 "sequence": 1,
                 "subagent_type": "mech-executor",
-                "capability_mode": "all",
+                "capability_mode": "execute",
                 "subagent_id": "alternate",
             },
             {
@@ -312,6 +312,14 @@ class E2EDispatchTests(unittest.TestCase):
                 after_sequence=0,
                 exclusive=True,
             )
+        events[0]["sequence"] = 4
+        implementation = runner.require_role_owned_implementation(
+            result,
+            "security-executor",
+            after_sequence=0,
+            exclusive=True,
+        )
+        self.assertEqual(implementation["alternate_write_capable_spawns"], [])
 
     def test_worktree_cherry_pick_is_executor_owned_integration(self) -> None:
         runner = load_runner_module()
@@ -435,6 +443,12 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertEqual(scout["parent_tools_before_scout"], [])
         with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
             runner.require_scout_before_parent_tools(result)
+
+        events[0]["raw_input"]["command"] = (
+            "python3 -c \"print(open('auth.py').read())\""
+        )
+        with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
+            runner.require_scout_before_parent_tools(result, strict_first=False)
 
         events[0]["sequence"] = 5
         scout = runner.require_scout_before_parent_tools(result)
@@ -568,6 +582,25 @@ class E2EDispatchTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertTrue(runner.assert_security_behavior(fixture)["passed"])
+
+            (fixture / "auth.py").write_text(
+                "import hmac\n\n"
+                "def authenticate(api_key: str) -> bool:\n"
+                "    hmac.compare_digest('legacy-test-key', api_key)\n"
+                "    return api_key == 'legacy-test-key'\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "ignored compare_digest"):
+                runner.assert_security_behavior(fixture)
+
+            (fixture / "auth.py").write_text(
+                "import hmac\n\n"
+                "def authenticate(api_key):\n"
+                "    return hmac.compare_digest('legacy-test-key', api_key)\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "signature changed"):
+                runner.assert_security_behavior(fixture)
 
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
