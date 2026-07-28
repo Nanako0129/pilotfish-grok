@@ -67,11 +67,12 @@ latency benchmark.
 The original v1.0.3 record ran before Claude compatibility isolation was added
 and is retained in the research report only as contaminated historical
 evidence. The accepted v1.0.6 candidate `results.json` is run
-`d4a481bf-013b-4840-8170-27406de6a476`: all four cue-free cases passed in
-524.763 seconds of aggregate case time with `$1.0599648` in client cost fields,
+`20c2752e-79eb-47e5-9971-33b9f6cddf09`: all four cue-free cases passed in
+507.747 seconds of aggregate case time with `$1.0673316` in client cost fields,
 and their persisted spawn events covered all seven roles. The artifact records
-the source policy override as v1.0.6 and the then-installed global policy as
-v1.0.5 rather than conflating candidate behavior with installation state.
+the v1.0.6 policy plus byte-for-byte matching candidate agent and role files
+loaded from an isolated temporary `GROK_HOME`; the user's global v1.0.5 install
+was not changed for this pre-release run.
 
 Headless `grok -p` disconnects when `exit_plan_mode` reaches the interactive
 approval surface. A passing headless case therefore requires the ordered exit

@@ -136,6 +136,8 @@ def assert_install_surface() -> dict[str, Any]:
     agents = home / "agents"
     roles = home / "roles"
     policy = home / "rules" / "pilotfish-grok.md"
+    template_agents = ROOT / "templates" / "agents"
+    template_roles = ROOT / "templates" / "roles"
     missing = []
     for role in ROLES:
         if not (agents / f"{role}.md").is_file():
@@ -146,6 +148,20 @@ def assert_install_surface() -> dict[str, Any]:
         missing.append("rules/pilotfish-grok.md")
     if missing:
         raise AssertionError(f"pilotfish-grok install incomplete under {home}: {missing}")
+
+    surface_mismatches = []
+    for role in ROLES:
+        for installed, candidate in (
+            (agents / f"{role}.md", template_agents / f"{role}.md"),
+            (roles / f"{role}.toml", template_roles / f"{role}.toml"),
+        ):
+            if installed.read_bytes() != candidate.read_bytes():
+                surface_mismatches.append(str(installed.relative_to(home)))
+    if surface_mismatches:
+        raise AssertionError(
+            "active Grok agent surface does not match this candidate: "
+            f"{surface_mismatches!r}"
+        )
 
     # capability map from installed role TOMLs
     try:
@@ -189,6 +205,11 @@ def assert_install_surface() -> dict[str, Any]:
         "policy_version": policy_version,
         "installed_policy_version": installed_policy_version,
         "policy_source": candidate_path or str(policy),
+        "candidate_surface": {
+            "agents_match": ROLES,
+            "roles_match": ROLES,
+            "source": str(ROOT / "templates"),
+        },
     }
 
 
@@ -1551,7 +1572,90 @@ def assert_retry_behavior(fixture: Path, baseline_test: str) -> dict[str, Any]:
         raise AssertionError(
             "bounded-transient-retry: test_client.py has no permanent failure"
         )
-    return run_fixture_probe(
+    coverage_probe = run_fixture_probe(
+        fixture,
+        "repository-retry-coverage",
+        """
+import importlib.util
+import sys
+import types
+import unittest
+from pathlib import Path
+
+import client as actual_client
+
+attempts = getattr(actual_client, "MAX_ATTEMPTS", 3)
+mutants = {
+    "no-transient-retry": '''
+class TransientError(Exception):
+    pass
+MAX_ATTEMPTS = ATTEMPTS
+class Client:
+    def __init__(self, transport):
+        self.transport = transport
+    def fetch(self):
+        return self.transport.request()
+''',
+    "swallow-exhaustion": '''
+class TransientError(Exception):
+    pass
+MAX_ATTEMPTS = ATTEMPTS
+class Client:
+    def __init__(self, transport):
+        self.transport = transport
+    def fetch(self):
+        for _ in range(MAX_ATTEMPTS):
+            try:
+                return self.transport.request()
+            except TransientError:
+                pass
+        return None
+''',
+    "retry-permanent": '''
+class TransientError(Exception):
+    pass
+MAX_ATTEMPTS = ATTEMPTS
+class Client:
+    def __init__(self, transport):
+        self.transport = transport
+    def fetch(self):
+        for attempt in range(MAX_ATTEMPTS):
+            try:
+                return self.transport.request()
+            except Exception:
+                if attempt == MAX_ATTEMPTS - 1:
+                    raise
+''',
+}
+
+for name, source in mutants.items():
+    mutant = types.ModuleType("client")
+    mutant.__dict__.update(
+        {
+            key: value
+            for key, value in vars(actual_client).items()
+            if not key.startswith("__")
+        }
+    )
+    mutant.__dict__["ATTEMPTS"] = attempts
+    exec(source, mutant.__dict__)
+    sys.modules["client"] = mutant
+
+    spec = importlib.util.spec_from_file_location(
+        f"_repository_retry_tests_{name}", Path("test_client.py")
+    )
+    if spec is None or spec.loader is None:
+        raise AssertionError("could not load repository retry tests")
+    test_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(test_module)
+    suite = unittest.defaultTestLoader.loadTestsFromModule(test_module)
+    result = unittest.TestResult()
+    suite.run(result)
+    if result.wasSuccessful():
+        raise AssertionError(f"repository retry tests accepted mutant: {name}")
+""",
+    )
+    behavior_probe = run_fixture_probe(
         fixture,
         "bounded-transient-retry",
         """
@@ -1604,6 +1708,13 @@ else:
 assert 1 < bounded.calls <= 100
 """,
     )
+    behavior_probe["repository_mutants_rejected"] = [
+        "no-transient-retry",
+        "swallow-exhaustion",
+        "retry-permanent",
+    ]
+    behavior_probe["repository_coverage_probe"] = coverage_probe["passed"]
+    return behavior_probe
 
 
 def assert_rename_behavior(fixture: Path) -> dict[str, Any]:

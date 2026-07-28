@@ -15,11 +15,25 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNNER = ROOT / "benchmarks" / "e2e-dispatch" / "run.py"
 RESULTS = ROOT / "benchmarks" / "e2e-dispatch" / "results.json"
+
+
+def populate_candidate_home(home: Path, installed_home: Path | None = None) -> None:
+    home.mkdir(parents=True, exist_ok=True)
+    if installed_home and (installed_home / "config.toml").is_file():
+        shutil.copy2(installed_home / "config.toml", home / "config.toml")
+    shutil.copytree(ROOT / "templates" / "agents", home / "agents")
+    shutil.copytree(ROOT / "templates" / "roles", home / "roles")
+    (home / "rules").mkdir()
+    shutil.copy2(
+        ROOT / "templates" / "rules.pilotfish-grok.md",
+        home / "rules" / "pilotfish-grok.md",
+    )
 
 
 def load_runner_module():
@@ -115,6 +129,35 @@ class E2EDispatchTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(AssertionError, "Claude compatibility leaked"):
                 runner.assert_session_claude_isolated(session)
+
+    def test_candidate_agent_surface_must_match_active_home(self) -> None:
+        runner = load_runner_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            populate_candidate_home(home)
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "GROK_HOME": str(home),
+                    "PILOTFISH_GROK_E2E_POLICY": str(
+                        ROOT / "templates" / "rules.pilotfish-grok.md"
+                    ),
+                },
+            ):
+                evidence = runner.assert_install_surface()
+                self.assertEqual(
+                    evidence["candidate_surface"]["agents_match"],
+                    runner.ROLES,
+                )
+                verifier = home / "agents" / "verifier.md"
+                verifier.write_text(
+                    verifier.read_text(encoding="utf-8") + "\nstale\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(
+                    AssertionError, "agent surface does not match"
+                ):
+                    runner.assert_install_surface()
 
     def test_cue_free_prompt_guard(self) -> None:
         runner = load_runner_module()
@@ -525,8 +568,51 @@ class E2EDispatchTests(unittest.TestCase):
                 "        self.assertTrue(RuntimeError('permanent'))\n",
                 encoding="utf-8",
             )
-            self.assertTrue(
-                runner.assert_retry_behavior(fixture, baseline_test)["passed"]
+            with self.assertRaisesRegex(AssertionError, "accepted mutant"):
+                runner.assert_retry_behavior(fixture, baseline_test)
+
+            (fixture / "test_client.py").write_text(
+                "import unittest\n"
+                "from client import Client, TransientError\n\n"
+                "class Transport:\n"
+                "    def __init__(self, outcomes):\n"
+                "        self.outcomes = iter(outcomes)\n"
+                "        self.calls = 0\n"
+                "    def request(self):\n"
+                "        self.calls += 1\n"
+                "        outcome = next(self.outcomes)\n"
+                "        if isinstance(outcome, BaseException):\n"
+                "            raise outcome\n"
+                "        return outcome\n\n"
+                "class RetryTest(unittest.TestCase):\n"
+                "    def test_success(self):\n"
+                "        transport = Transport(['ok'])\n"
+                "        self.assertEqual(Client(transport).fetch(), 'ok')\n\n"
+                "    def test_retry(self):\n"
+                "        transport = Transport([TransientError(), 'ok'])\n"
+                "        self.assertEqual(Client(transport).fetch(), 'ok')\n"
+                "        self.assertEqual(transport.calls, 2)\n\n"
+                "    def test_exhaustion(self):\n"
+                "        transport = Transport([TransientError(), TransientError()])\n"
+                "        with self.assertRaises(TransientError):\n"
+                "            Client(transport).fetch()\n"
+                "        self.assertEqual(transport.calls, 2)\n\n"
+                "    def test_permanent(self):\n"
+                "        transport = Transport([RuntimeError('permanent')])\n"
+                "        with self.assertRaises(RuntimeError):\n"
+                "            Client(transport).fetch()\n"
+                "        self.assertEqual(transport.calls, 1)\n",
+                encoding="utf-8",
+            )
+            retry_probe = runner.assert_retry_behavior(fixture, baseline_test)
+            self.assertTrue(retry_probe["passed"])
+            self.assertEqual(
+                retry_probe["repository_mutants_rejected"],
+                [
+                    "no-transient-retry",
+                    "swallow-exhaustion",
+                    "retry-permanent",
+                ],
             )
 
             for filename in ("auth.py", "test_auth.py", "README.md"):
@@ -1068,6 +1154,14 @@ class E2EDispatchTests(unittest.TestCase):
             payload["install"]["policy_version"],
             (ROOT / "VERSION").read_text(encoding="utf-8").strip(),
         )
+        self.assertEqual(
+            payload["install"]["candidate_surface"]["agents_match"],
+            runner.ROLES,
+        )
+        self.assertEqual(
+            payload["install"]["candidate_surface"]["roles_match"],
+            runner.ROLES,
+        )
         self.assertEqual(payload["claude_isolation"]["active_claude_entries"], 0)
         cases = {case["case"]: case for case in payload["cases"]}
         self.assertEqual(
@@ -1129,6 +1223,16 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertTrue(
             cases["cue-free-judgment"]["gate"]["behavior_probe"]["passed"]
         )
+        self.assertEqual(
+            cases["cue-free-judgment"]["gate"]["behavior_probe"][
+                "repository_mutants_rejected"
+            ],
+            [
+                "no-transient-retry",
+                "swallow-exhaustion",
+                "retry-permanent",
+            ],
+        )
         self.assertTrue(
             cases["cue-free-security"]["gate"]["behavior_probe"]["passed"]
         )
@@ -1171,22 +1275,26 @@ class E2EDispatchTests(unittest.TestCase):
             self.skipTest("install probe disabled")
         if not shutil.which("grok"):
             self.skipTest("grok not on PATH")
-        home = Path(os.environ.get("GROK_HOME", Path.home() / ".grok"))
-        if not (home / "agents" / "scout.md").is_file():
+        installed_home = Path(os.environ.get("GROK_HOME", Path.home() / ".grok"))
+        if not (installed_home / "agents" / "scout.md").is_file():
             self.skipTest("pilotfish-grok not installed")
-        proc = subprocess.run(
-            ["python3", str(RUNNER), "--skip-live"],
-            cwd=str(ROOT),
-            capture_output=True,
-            text=True,
-            timeout=90,
-            env={
-                **os.environ,
-                "PILOTFISH_GROK_E2E_POLICY": str(
-                    ROOT / "templates" / "rules.pilotfish-grok.md"
-                ),
-            },
-        )
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate_home = Path(tmp)
+            populate_candidate_home(candidate_home, installed_home)
+            proc = subprocess.run(
+                ["python3", str(RUNNER), "--skip-live"],
+                cwd=str(ROOT),
+                capture_output=True,
+                text=True,
+                timeout=90,
+                env={
+                    **os.environ,
+                    "GROK_HOME": str(candidate_home),
+                    "PILOTFISH_GROK_E2E_POLICY": str(
+                        ROOT / "templates" / "rules.pilotfish-grok.md"
+                    ),
+                },
+            )
         self.assertEqual(
             proc.returncode,
             0,

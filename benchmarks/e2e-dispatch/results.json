@@ -1,8 +1,8 @@
 {
   "schema": "pilotfish-grok.e2e-dispatch.v5",
-  "started_at": "2026-07-28T16:14:08.509282+00:00",
+  "started_at": "2026-07-28T16:36:18.094911+00:00",
   "repo": "/Users/nanako/side-project/pilotfish-grok",
-  "run_id": "d4a481bf-013b-4840-8170-27406de6a476",
+  "run_id": "20c2752e-79eb-47e5-9971-33b9f6cddf09",
   "cases": [
     {
       "case": "cue-free-discovery",
@@ -17,37 +17,37 @@
       "spawns": [
         {
           "kind": "spawned",
-          "sequence": 7,
+          "sequence": 3,
           "subagent_type": "scout",
           "role": "scout",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019fa981-6040-7ad2-83df-721e6830e8a4"
+          "subagent_id": "019fa995-b4b7-78c0-8ef8-2f520207f54b"
         }
       ],
-      "session_id": "019fa981-478f-7cf2-a54f-4ee349a27bc5",
-      "wall_seconds": 14.102,
-      "total_cost_usd": 0.0745036,
+      "session_id": "019fa995-9668-7cd3-8873-9f483c1e0fb7",
+      "wall_seconds": 16.469,
+      "total_cost_usd": 0.0617088,
       "num_turns": 2,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
-        "hook_execution_events": 5,
+        "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 49987,
-          "updates.jsonl": 11126
+          "chat_history.jsonl": 39100,
+          "updates.jsonl": 9200
         }
       },
       "gate": {
         "discovery": {
           "role": "scout",
           "capability_mode": "read-only",
-          "subagent_id": "019fa981-6040-7ad2-83df-721e6830e8a4",
-          "spawn_sequence": 7,
-          "finish_sequence": 8,
-          "output": "## 搜尋結果\n\n**找到 1 處完全相符：**\n\n- `secret_marker.txt:1`\n  - 內容：`PILOTFISH_GROK_E2E_MARKER_42`（該行即整段標記字串本身）\n\n相對路徑：`secret_marker.txt`",
+          "subagent_id": "019fa995-b4b7-78c0-8ef8-2f520207f54b",
+          "spawn_sequence": 3,
+          "finish_sequence": 4,
+          "output": "**Found:** `secret_marker.txt:1`\n\nExact match:\n```1:1:secret_marker.txt\nPILOTFISH_GROK_E2E_MARKER_42\n```\n\nRelative path: `secret_marker.txt` (workspace root).",
           "parent_tools_before_scout": [],
-          "spawn_tool_sequence": 5
+          "spawn_tool_sequence": 2
         }
       }
     },
@@ -68,76 +68,76 @@
       "spawns": [
         {
           "kind": "spawned",
-          "sequence": 7,
+          "sequence": 4,
           "subagent_type": "scout",
           "role": "scout",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019fa981-aa50-76c3-a734-6721fc96ae97"
+          "subagent_id": "019fa996-004e-7823-87fb-3dbced234f44"
         },
         {
           "kind": "spawned",
-          "sequence": 16,
+          "sequence": 11,
           "subagent_type": "mech-executor",
           "role": "mech-executor",
           "capability_mode": "all",
           "model": "grok-4.5",
-          "subagent_id": "019fa982-19bb-7f93-bfae-ba6d4a4fb553"
+          "subagent_id": "019fa996-6319-7521-ba6d-50593a9a875d"
         },
         {
           "kind": "spawned",
-          "sequence": 25,
+          "sequence": 21,
           "subagent_type": "verifier",
           "role": "verifier",
           "capability_mode": "execute",
           "model": "grok-4.5",
-          "subagent_id": "019fa982-7be0-71b1-919b-56f7c3d7979b"
+          "subagent_id": "019fa997-0354-7ca3-ab1b-c3d74f074758"
         }
       ],
-      "session_id": "019fa981-7f0e-7252-9767-86d75bf64a35",
-      "wall_seconds": 96.606,
-      "total_cost_usd": 0.2648468,
+      "session_id": "019fa995-d3f1-7cb1-aed0-ad09298b34f5",
+      "wall_seconds": 104.491,
+      "total_cost_usd": 0.2549492,
       "num_turns": 4,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
-        "hook_execution_events": 9,
+        "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 62168,
-          "updates.jsonl": 43934
+          "chat_history.jsonl": 58514,
+          "updates.jsonl": 42883
         }
       },
       "gate": {
         "discovery": {
           "role": "scout",
           "capability_mode": "read-only",
-          "subagent_id": "019fa981-aa50-76c3-a734-6721fc96ae97",
-          "spawn_sequence": 7,
-          "finish_sequence": 8,
-          "output": "## 偵察結果：`authenticate` → `validate_api_key`\n\n### 儲存庫結構\n扁平 Python fixture，無子目錄、無 `package.json` / `pyproject.toml` / `Cargo.toml`：\n\n- `auth.py` — 定義\n- `client.py` — 無關（`Client.fetch`）\n- `test_auth.py` — 單元測試\n- `test_client.py` — 無關\n- `README.md` — 文件\n- `secret_marker.txt` — 標記字串，與 rename 無關\n\n### 所有 `authenticate` 匹配（完整）\n\n| 位置 | 內容 | 是否應改 |\n|---|---|---|\n| `auth.py:1` | `def authenticate(api_key: str) -> bool:` | **是** — 主定義 |\n| `test_auth.py:3` | `from auth import authenticate` | **是** — import |\n| `test_auth.py:7` | `def test_authenticate(self) -> None:` | **是** — 測試方法名（建議一併改） |\n| `test_auth.py:8` | `self.assertTrue(authenticate('legacy-test-key'))` | **是** — 呼叫點 |\n| `test_auth.py:9` | `self.assertFalse(authenticate('wrong'))` | **是** — 呼叫點 |\n| `README.md:3` | `` Call `authenticate(api_key)` for API-key checks. `` | **是** — API 文件 |\n\n未出現 `Authenticate` / `AUTHENTICATE`。`client.py`、`test_client.py`、`secret_marker.txt` 無此符號。\n\n### 主定義與引用\n- **主定義**：`auth.py:1` `authenticate`\n- **呼叫／import／測試／文件**：僅 `test_auth.py` 與 `README.md`（如上）\n- **無** re-export、`__all__`、動態 getattr\n\n### 不應改名\n- 無第三方 API 同名約束\n- 英文一般用字：此 repo 中所有 `authenticate` 皆為同一 API 符號族\n- `secret_marker.txt`、`Client` 相關檔案不動\n\n### 需編輯檔案（完整清單）\n1. `auth.py`\n2. `test_auth.py`\n3. `README.md`\n\n### 建議 rename map\n| 舊 | 新 |\n|---|---|\n| `authenticate`（函式） | `validate_api_key` |\n| `from auth import authenticate` | `from auth import validate_api_key` |\n| `authenticate(...)` 呼叫 | `validate_api_key(...)` |\n| `test_authenticate` | `test_validate_api_key`（慣例對齊） |\n| README `` `authenticate(api_key)` `` | `` `validate_api_key(api_key)` `` |\n\n### 測試如何跑\n- 框架：標準庫 `unittest`（`test_auth.py` / `test_client.py` 皆 `unittest.main()`）\n- 無套件管理器腳本\n- 建議（於 workspace root）：\n\n```bash\npython -m unittest discover -s . -v\n```\n\n或：\n\n```bash\npython -m unittest test_auth test_client -v\n```",
+          "subagent_id": "019fa996-004e-7823-87fb-3dbced234f44",
+          "spawn_sequence": 4,
+          "finish_sequence": 5,
+          "output": "## Project summary\nSmall pure-Python e2e fixture: `auth.py` (API-key check), `client.py` (transport wrapper), matching `unittest` tests, and a short `README.md`. No package manager config, Makefile, or pytest setup. `secret_marker.txt` is unrelated marker content.\n\n## How to run tests\nFrom the workspace root:\n```bash\npython -m unittest discover -v\n# or\npython test_auth.py\npython test_client.py\n```\n\n## Rename candidates (`authenticate` → `validate_api_key`)\n\n| Path:line | Kind | Context |\n|-----------|------|---------|\n| `auth.py:1` | function definition | `def authenticate(api_key: str) -> bool:` |\n| `test_auth.py:3` | import | `from auth import authenticate` |\n| `test_auth.py:7` | test method name (related form) | `def test_authenticate(self) -> None:` → likely `test_validate_api_key` |\n| `test_auth.py:8` | call | `authenticate('legacy-test-key')` |\n| `test_auth.py:9` | call | `authenticate('wrong')` |\n| `README.md:3` | docs / symbol reference | `` Call `authenticate(api_key)` for API-key checks. `` |\n\nNo other `authenticate` / `authenticat*` hits in the repo. `client.py` and `test_client.py` do not reference it.\n\n## Non-candidates / false positives\n- **None** for the exact identifier `authenticate` (all six hits are this symbol).\n- Do **not** rename as part of this symbol: module path/`auth` in `from auth import …`, class `AuthTest`, filenames `auth.py` / `test_auth.py`, `Client` / `fetch`, or `secret_marker.txt`.\n- No third-party auth APIs present.\n\n## Recommended exclusive file ownership for the rename\n1. `auth.py`\n2. `test_auth.py`\n3. `README.md`\n\n(`client.py`, `test_client.py`, `secret_marker.txt` out of scope.)",
           "parent_tools_before_scout": [],
-          "spawn_tool_sequence": 5
+          "spawn_tool_sequence": 3
         },
         "implementation": {
           "role": "mech-executor",
           "capability_mode": "all",
-          "subagent_id": "019fa982-19bb-7f93-bfae-ba6d4a4fb553",
-          "spawn_sequence": 16,
-          "finish_sequence": 17,
-          "output": "## 變更檔案\n\n| 檔案 | 變更 |\n|---|---|\n| `auth.py` | `def authenticate(...)` → `def validate_api_key(...)` |\n| `test_auth.py` | import、測試方法名、兩處呼叫皆改為 `validate_api_key` |\n| `README.md` | `` `authenticate(api_key)` `` → `` `validate_api_key(api_key)` `` |\n\n未改動：`client.py`、`test_client.py`、`secret_marker.txt`；函式本體／回傳值／測試 key 字串不變。\n\n## Diff 摘要\n\n- 函式定義：`authenticate` → `validate_api_key`\n- import：`from auth import validate_api_key`\n- 測試方法：`test_authenticate` → `test_validate_api_key`\n- 呼叫：`validate_api_key('legacy-test-key')`、`validate_api_key('wrong')`\n- 文件：`validate_api_key(api_key)`\n\n## 測試輸出\n\n```\ntest_validate_api_key (test_auth.AuthTest.test_validate_api_key) ... ok\ntest_fetch (test_client.ClientTest.test_fetch) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n```\n\n（環境使用 `python3 -m unittest discover -s . -v`；`python` 指令不存在。）\n\n## `authenticate` 殘留檢查\n\n對工作區全文搜尋 `authenticate`：**零筆**，無殘留。\n\n## 驗證方式\n\n- 僅編輯規格所列三檔\n- 單元測試全部通過\n- 確認無 `authenticate` 字樣\n\n## 延後項目\n\n無。",
+          "subagent_id": "019fa996-6319-7521-ba6d-50593a9a875d",
+          "spawn_sequence": 11,
+          "finish_sequence": 12,
+          "output": "## Summary\n\n### Files changed\n1. **`auth.py`** — Renamed `def authenticate` → `def validate_api_key` (body unchanged).\n2. **`test_auth.py`** — Import, test method name, and both call sites now use `validate_api_key`.\n3. **`README.md`** — Doc reference updated to `validate_api_key(api_key)`.\n\n### Verification\n- Grep for `authenticate` in the three owned files: **no matches**.\n- Tests (`python3 -m unittest discover -v`; `python` was not available on PATH):\n\n```\ntest_validate_api_key (test_auth.AuthTest.test_validate_api_key) ... ok\ntest_fetch (test_client.ClientTest.test_fetch) ... ok\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nOK\n```\n\n### Deferred\nNothing. Unowned files (`client.py`, etc.) left untouched as specified.",
           "parent_mutation_tools": [],
           "parent_verification_tools": [],
           "parent_integration_tools": [],
-          "result_ready_sequence": 17,
+          "result_ready_sequence": 12,
           "alternate_write_capable_spawns": []
         },
         "verification": {
           "role": "verifier",
           "capability_mode": "execute",
-          "subagent_id": "019fa982-7be0-71b1-919b-56f7c3d7979b",
-          "spawn_sequence": 25,
-          "finish_sequence": 26,
-          "output": "CONFIRMED\n\n獨立驗證結果如下：\n\n### 1. `auth.py` 定義\n- 路徑：`auth.py:1` — `def validate_api_key(api_key: str) -> bool:`\n- 實作：`return api_key == 'legacy-test-key'`（無 `authenticate`）\n\n### 2. `test_auth.py`\n- `from auth import validate_api_key`（L3）\n- 方法名 `test_validate_api_key`（L7）\n- 呼叫 `validate_api_key('legacy-test-key')` / `validate_api_key('wrong')`（L8–9）\n\n### 3. `README.md`\n- L3：`Call \\`validate_api_key(api_key)\\` for API-key checks.`\n\n### 4. 全庫搜尋 `authenticate`\n- `rg` / `rg -i authenticate`：repo 內**零**筆相符（含原始碼；`secret_marker.txt` 亦無）\n- `import auth; hasattr(auth, 'authenticate')` → 無此屬性\n- `validate_api_key` 出現於 `auth.py`、`test_auth.py`、`README.md`（共 6 處原始碼/文件引用）\n\n### 5. 行為未變（自行探測）\n```text\nvalidate_api_key('legacy-test-key') is True\nvalidate_api_key('wrong') is False\nvalidate_api_key('') is False\nvalidate_api_key('legacy-test-key ') is False\n```\n語意仍為嚴格字串相等 `'legacy-test-key'` → `bool`。\n\n### 6. 測試\n```text\n$ python3 -m unittest discover -s . -v\ntest_validate_api_key (test_auth.AuthTest.test_validate_api_key) ... ok\ntest_fetch (test_client.ClientTest.test_fetch) ... ok\nRan 2 tests in 0.000s\nOK\nEXIT:0\n```\n\n**結論：** Expected state 1–6 皆由本 session 自行讀檔、搜尋與執行測試所證實；claim 成立。",
+          "subagent_id": "019fa997-0354-7ca3-ab1b-c3d74f074758",
+          "spawn_sequence": 21,
+          "finish_sequence": 22,
+          "output": "CONFIRMED\n\n## Evidence\n\n**Repo grep**\n- `authenticate`: no matches under the workspace (source, tests, docs).\n- `validate_api_key` only in:\n  - `auth.py` (definition)\n  - `test_auth.py` (import, test method, calls)\n  - `README.md` (docs)\n\n**File inspection**\n- `auth.py`: `def validate_api_key(api_key: str) -> bool:` with `return api_key == 'legacy-test-key'` — no `authenticate` function.\n- `test_auth.py`: `from auth import validate_api_key`; method `test_validate_api_key`; asserts True for `'legacy-test-key'`, False for `'wrong'`.\n- `README.md`: documents `validate_api_key(api_key)`.\n- `client.py` / `test_client.py`: unrelated client/fetch code; no auth symbol references.\n- `secret_marker.txt`: unrelated marker string.\n\n**Commands run** (cwd: fixture root)\n1. `python3 -m unittest discover -v`  \n   - `test_validate_api_key` … ok  \n   - `test_fetch` … ok  \n   - Ran 2 tests — **OK**\n2. Direct behavior probes: `validate_api_key('legacy-test-key')` True; `'wrong'` False; `''` False — **edge probes ok**\n3. `from auth import authenticate` → `ImportError: cannot import name 'authenticate'` (old name gone as expected)\n4. `rg -n 'authenticate|validate_api_key' --glob '!__pycache__' .` — only the expected `validate_api_key` sites\n\n## What passed\n- Rename is complete on claimed surfaces (source, tests, documentation).\n- No stale `authenticate` symbol references remain in the tree.\n- Behavior matches the intended API-key check; unit tests pass when re-run here.\n\n## Residual risks\n- None material for this claim. `__pycache__` may still hold older bytecode filenames historically, but live imports resolve `validate_api_key` only; no source/docs leftovers.",
           "claim_terms": [
             "validate_api_key",
             "auth.py",
@@ -168,57 +168,57 @@
       "spawns": [
         {
           "kind": "spawned",
-          "sequence": 28,
+          "sequence": 5,
           "subagent_type": "executor",
           "role": "executor",
           "capability_mode": "all",
           "model": "grok-4.5",
-          "subagent_id": "019fa983-571e-7393-8763-b526b1fed075"
+          "subagent_id": "019fa997-b884-7fb1-b8ce-0fb7c54285cc"
         },
         {
           "kind": "spawned",
-          "sequence": 38,
+          "sequence": 23,
           "subagent_type": "verifier",
           "role": "verifier",
           "capability_mode": "execute",
           "model": "grok-4.5",
-          "subagent_id": "019fa983-dae9-7193-a6af-cca20bda163c"
+          "subagent_id": "019fa998-5003-7722-bacf-fc12f68d2579"
         }
       ],
-      "session_id": "019fa982-f907-7291-8362-9483dabc1bc8",
-      "wall_seconds": 93.177,
-      "total_cost_usd": 0.1892768,
-      "num_turns": 4,
+      "session_id": "019fa997-6afe-7a30-9a54-1b11b4c13e23",
+      "wall_seconds": 87.549,
+      "total_cost_usd": 0.2222488,
+      "num_turns": 6,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
-        "hook_execution_events": 15,
+        "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 65862,
-          "updates.jsonl": 54093
+          "chat_history.jsonl": 64942,
+          "updates.jsonl": 51242
         }
       },
       "gate": {
         "implementation": {
           "role": "executor",
           "capability_mode": "all",
-          "subagent_id": "019fa983-571e-7393-8763-b526b1fed075",
-          "spawn_sequence": 28,
-          "finish_sequence": 30,
-          "output": "## 結果\n\n已在 `client.py` 加入有界重試，並在 `test_client.py` 補齊三種失敗情境測試；`python3 -m unittest test_client -v` 四項皆通過。\n\n## 1. 設計選擇\n\n| 項目 | 決定 |\n|------|------|\n| 嘗試上限 | `MAX_ATTEMPTS = 3`（1 次初始 + 最多 2 次重試） |\n| 可重試錯誤 | 僅 `TransientError` |\n| 用盡重試 | 重新拋出**最後一次**的 `TransientError` |\n| 其他例外 | 立即 re-raise，不重試 |\n| 延遲 | 無 sleep/backoff（測試快速且可預期） |\n| 公開 API | 維持 `Client(transport)` 與 `fetch()`，建構子無新必填參數 |\n\n## 2. 變更檔案\n\n- `client.py` — 匯出 `TransientError`、`MAX_ATTEMPTS`、`Client`（`fetch` 含重試）\n- `test_client.py` — 既有 happy path + 暫時成功、用盡重試、永久失敗\n\n未改動 `auth.py`、`test_auth.py`、`secret_marker.txt`、`README.md`。\n\n## 3. 測試結果\n\n```\ntest_fetch ... ok\ntest_fetch_exhausts_retries_on_transient ... ok\ntest_fetch_permanent_error_no_retry ... ok\ntest_fetch_retries_transient_then_succeeds ... ok\n\nRan 4 tests in 0.000s\nOK\n```\n\n（本機指令為 `python3 -m unittest test_client -v`，因 `python` 不在 PATH。）\n\n## 4. 最終內容\n\n**`client.py`**\n\n```python\n\"\"\"HTTP-ish client with bounded retry for transient failures.\"\"\"\n\nMAX_ATTEMPTS = 3\n\n\nclass TransientError(Exception):\n    \"\"\"Retryable transport failure. Only this type triggers retries in Client.fetch.\"\"\"\n\n\nclass Client:\n    def __init__(self, transport):\n        self.transport = transport\n\n    def fetch(self):\n        last_error = None\n        for _ in range(MAX_ATTEMPTS):\n            try:\n                return self.transport.request()\n            except TransientError as exc:\n                last_error = exc\n            # Any other Exception propagates immediately (no retry).\n        raise last_error\n```\n\n**`test_client.py`** — 在原有 `test_fetch` 外新增：\n\n- `test_fetch_retries_transient_then_succeeds`：兩次 `TransientError` 後成功，`calls == 3`\n- `test_fetch_exhausts_retries_on_transient`：全程暫時失敗，拋 `TransientError`，`calls == MAX_ATTEMPTS`\n- `test_fetch_permanent_error_no_retry`：`ValueError` 立即失敗，`calls == 1`",
+          "subagent_id": "019fa997-b884-7fb1-b8ce-0fb7c54285cc",
+          "spawn_sequence": 5,
+          "finish_sequence": 9,
+          "output": "## 1. Summary of changes\n\n**`client.py`**\n- Exported `TransientError` (only retryable exception).\n- Added `MAX_ATTEMPTS = 3`.\n- `Client.fetch()` retries only on `TransientError`; other exceptions fail immediately; after all attempts fail transiently, re-raises the last `TransientError`.\n- Public API unchanged: `Client(transport)` and `fetch()`.\n\n**`test_client.py`**\n- Kept existing happy-path test.\n- Added: transient then success (3 calls), exhaustion (re-raises last `TransientError`, call count = limit), permanent failure (1 call, no retry).\n\n## 2. Attempt limit and failure behavior\n\n| Choice | Value |\n|--------|--------|\n| **Limit** | `MAX_ATTEMPTS = 3` (total tries, not “retries only”) |\n| **Retryable** | Only `TransientError` |\n| **Permanent** | Any other exception — fail on first raise, no further calls |\n| **Exhaustion** | Re-raise the last `TransientError` |\n| **Backoff** | None (immediate retry; simple and easy to test) |\n\n## 3. Tests\n\n```text\npython3 -m unittest test_client -v\n```\n\nAll 4 tests passed.\n\n## 4. Notes\n\n- No delay/jitter between attempts (keeps tests deterministic).\n- `MAX_ATTEMPTS` is a module constant so tests can assert against the same limit.\n- Residual risk: callers that previously treated all transport failures as single-shot now get up to 3 transport calls on transient errors (intended).",
           "parent_mutation_tools": [],
           "parent_verification_tools": [],
           "parent_integration_tools": [],
-          "result_ready_sequence": 30,
+          "result_ready_sequence": 9,
           "alternate_write_capable_spawns": []
         },
         "verification": {
           "role": "verifier",
           "capability_mode": "execute",
-          "subagent_id": "019fa983-dae9-7193-a6af-cca20bda163c",
-          "spawn_sequence": 38,
-          "finish_sequence": 39,
-          "output": "CONFIRMED\n\n## 驗證證據\n\n**自行閱讀的檔案**\n- [`client.py`](/private/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-x2yjsnmx/cue-free-judgment/fixture/client.py)：`MAX_ATTEMPTS = 3`；`TransientError(Exception)`；`Client.__init__(self, transport)` 無新增必要參數；`fetch()` 以 `for _ in range(MAX_ATTEMPTS)` 呼叫 `transport.request()`，僅 `except TransientError` 後繼續，其他例外直接往外拋；迴圈結束後 `raise last_error`。\n- [`test_client.py`](/private/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-x2yjsnmx/cue-free-judgment/fixture/test_client.py)：四個案例分別對應成功 1 次、暫態後成功（3 次呼叫）、暫態耗盡、永久錯誤不重試。\n\n**自行執行的測試**\n```text\npython3 -m unittest test_client -v\nRan 4 tests in 0.000s\nOK\n```\n\n**契約對照（含主動挑戰）**\n\n| 契約項 | 結果 |\n|---|---|\n| 匯出 `TransientError`（Exception 子類） | 是；`issubclass(TransientError, Exception)` 為 True |\n| 僅 `TransientError` 重試 | 是；`ValueError`/`OSError`/`RuntimeError` 皆立即失敗 |\n| `Client(transport)` / `fetch()` API | 保留，無必填新參數 |\n| 有界次數 | `MAX_ATTEMPTS = 3` |\n| 耗盡重拋最後一個 TransientError | 探針確認 `e is e3` 且 `calls == 3` |\n| 測試涵蓋四條路徑 | 皆有，且全綠 |\n\n**額外探針（非測試檔內）**\n- 三次不同 `TransientError` 時，重拋的是第三次實例（非第一次）。\n- 兩次暫態後第三次 `RuntimeError`：以永久錯誤結束，`calls == 3`（第 3 次不重試）。\n- `TransientError` 子類會被重試（符合 `except TransientError` 語意）。\n- `OSError` 不重試，`calls == 1`。\n\n未發現與契約衝突的實作缺口；測試非「假綠」——行為與預期一致。",
+          "subagent_id": "019fa998-5003-7722-bacf-fc12f68d2579",
+          "spawn_sequence": 23,
+          "finish_sequence": 27,
+          "output": "CONFIRMED\n\n### Evidence\n\n**Read**\n- `/private/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-3t7c6s48/cue-free-judgment/fixture/client.py`\n- `/private/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-3t7c6s48/cue-free-judgment/fixture/test_client.py`\n\n**Implementation matches claim**\n1. `TransientError` is defined and is the only exception type caught in `fetch()`; other exceptions propagate.\n2. `Client.__init__(self, transport)` and `Client.fetch()` are unchanged as the public surface; `MAX_ATTEMPTS = 3` and `TransientError` are importable from `client`.\n3. Loop is `for _ in range(MAX_ATTEMPTS)` with retry only on `TransientError`; non-transient errors are not caught; after exhaustion `raise last_error` re-raises the last `TransientError`.\n4. Tests cover happy path (`test_fetch`), transient→success (`test_fetch_retries_transient_then_succeeds`), exhaustion (`test_fetch_exhausts_transient_retries`), permanent immediate failure (`test_fetch_permanent_error_not_retried`).\n\n**Command run (reproduced)**\n```text\npython3 -m unittest test_client -v\n```\nResult: 4 tests, all `ok`, exit 0.\n\n**Independent edge probes (same session)**\n- `MAX_ATTEMPTS == 3`\n- Success after one transient: 2 calls\n- Exhaustion: last error message `'c'`, 3 calls\n- `ValueError` not retried (would have succeeded on retry if retried): 1 call\n- `RuntimeError` not retried: 1 call\n- Five queued transients: still only 3 attempts, last raised is attempt index 2\n\nNo counterexample found against the stated claim.",
           "claim_terms": [
             "client.py",
             "test_client.py",
@@ -230,7 +230,13 @@
         },
         "behavior_probe": {
           "name": "bounded-transient-retry",
-          "passed": true
+          "passed": true,
+          "repository_mutants_rejected": [
+            "no-transient-retry",
+            "swallow-exhaustion",
+            "retry-permanent"
+          ],
+          "repository_coverage_probe": true
         },
         "tests_passed": true
       }
@@ -257,66 +263,66 @@
       "spawns": [
         {
           "kind": "spawned",
-          "sequence": 15,
+          "sequence": 10,
           "subagent_type": "scout",
           "role": "scout",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019fa984-980f-7122-a484-409bc90b86b0"
+          "subagent_id": "019fa998-ee76-7cd3-bc6e-71f2ef072b6e"
         },
         {
           "kind": "spawned",
-          "sequence": 34,
+          "sequence": 17,
           "subagent_type": "security-reviewer",
           "role": "security-reviewer",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019fa985-2282-7d43-9ff5-d525f27cd482"
+          "subagent_id": "019fa999-5ec4-7a20-9bb4-a65a9022a3b8"
         },
         {
           "kind": "spawned",
-          "sequence": 55,
+          "sequence": 39,
           "subagent_type": "plan-verifier",
           "role": "plan-verifier",
           "capability_mode": "read-only",
           "model": "grok-4.5",
-          "subagent_id": "019fa987-48ca-7a63-b9cd-c7600d67b848"
+          "subagent_id": "019fa99b-7383-7723-b0ec-ec5b35979c66"
         },
         {
           "kind": "spawned",
-          "sequence": 83,
+          "sequence": 60,
           "subagent_type": "security-executor",
           "role": "security-executor",
           "capability_mode": "all",
           "model": "grok-4.5",
-          "subagent_id": "019fa988-59b4-7370-b0b8-6fe745ffa173"
+          "subagent_id": "019fa99c-6e36-78b0-823b-9a80a0dc593e"
         },
         {
           "kind": "spawned",
-          "sequence": 92,
+          "sequence": 67,
           "subagent_type": "verifier",
           "role": "verifier",
           "capability_mode": "execute",
           "model": "grok-4.5",
-          "subagent_id": "019fa988-f1c6-7b42-8668-e9eb518d0f14"
+          "subagent_id": "019fa99c-f355-7602-95ff-74b08cbc815f"
         }
       ],
-      "session_id": "019fa984-65dc-7a51-a1d9-d7f8a7fb5ef9",
-      "wall_seconds": 320.878,
-      "total_cost_usd": 0.5313376000000001,
-      "num_turns": 10,
+      "session_id": "019fa998-c150-7443-aeac-eea403491b67",
+      "wall_seconds": 299.238,
+      "total_cost_usd": 0.5284248,
+      "num_turns": 11,
       "session_isolation": {
         "claude_context_markers": [],
         "claude_hook_execution_events": 0,
-        "hook_execution_events": 28,
+        "hook_execution_events": 0,
         "checked_chars": {
-          "chat_history.jsonl": 103554,
-          "updates.jsonl": 193868
+          "chat_history.jsonl": 117273,
+          "updates.jsonl": 239233
         }
       },
       "gate": {
         "entered_first": true,
-        "plan_file": "/Users/nanako/.grok/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-x2yjsnmx%2Fcue-free-security%2Ffixture/019fa984-65dc-7a51-a1d9-d7f8a7fb5ef9/plan.md",
+        "plan_file": "/tmp/pilotfish-grok-e2e-v106.echc2O/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-3t7c6s48%2Fcue-free-security%2Ffixture/019fa998-c150-7443-aeac-eea403491b67/plan.md",
         "plan_verifier_spawns": 2,
         "verdicts": [
           "READY",
@@ -324,48 +330,48 @@
         ],
         "ready_units": [
           {
-            "id": "PE-AUTH-COMPARE-DIGEST",
+            "id": "ENV-AUTH-HMAC-001",
             "kind": "program envelope"
           },
           {
-            "id": "ES-AUTH-HMAC-COMPARE",
+            "id": "SLICE-AUTH-COMPARE-DIGEST-001",
             "kind": "execution slice"
           }
         ],
         "revision_loops": 0,
         "fresh_reverification_after_revise": false,
         "ready_before_exit": true,
-        "exit_sequence": 71,
+        "exit_sequence": 52,
         "awaiting_native_approval": true,
         "parent_mutation_tools": [],
         "write_capable_spawns": [],
         "security_review": {
           "subagent_ids": [
-            "019fa985-2282-7d43-9ff5-d525f27cd482"
+            "019fa999-5ec4-7a20-9bb4-a65a9022a3b8"
           ],
           "capability_mode": "read-only",
           "finished_before_readiness": true,
           "dispositions_presented_to_readiness": true,
           "covered_readiness_unit_ids": [
-            "ES-AUTH-HMAC-COMPARE",
-            "PE-AUTH-COMPARE-DIGEST"
+            "ENV-AUTH-HMAC-001",
+            "SLICE-AUTH-COMPARE-DIGEST-001"
           ],
           "scout_finished_before_review": true
         },
         "implementation": {
           "role": "security-executor",
           "capability_mode": "all",
-          "subagent_id": "019fa988-59b4-7370-b0b8-6fe745ffa173",
-          "spawn_sequence": 83,
-          "finish_sequence": 84,
-          "output": "驗收已通過。以下是結果摘要。\n\n## Outcome\n\n`ES-AUTH-HMAC-COMPARE` 已完成：`authenticate` 改為 `hmac.compare_digest` 常數時間比對，回歸測試與 README 已更新。\n\n### 變更\n\n| 檔案 | 內容 |\n|---|---|\n| `auth.py` | 新增 `import hmac`；`authenticate(api_key: str) -> bool` 改為 `hmac.compare_digest(api_key, 'legacy-test-key')`（兩端皆為 `str`） |\n| `test_auth.py` | 保留正確／錯誤金鑰案例；新增 `test_authenticate_empty_string_rejected`（`''` → False） |\n| `README.md` | 註明以 `hmac.compare_digest` 做 constant-time comparison；未過度宣稱；`Client.fetch()` 說明未動 |\n\n### 驗證\n\n```text\n$ python3 -m unittest test_auth\nRan 2 tests in 0.000s\nOK\n```\n\n（環境無 `python`，以 `python3` 執行；行為與契約中的 `python -m unittest test_auth` 等價。）\n\n靜態檢查：`auth.py` 使用 `hmac.compare_digest`，已無 `==` 密鑰比對。\n\n### 安全假設與殘餘風險（已接受）\n\n1. **硬編碼金鑰**：預期值仍為 `'legacy-test-key'`；契約明確接受此 residual risk，未外部化。\n2. **str-only 契約**：`compare_digest` 兩端皆為 `str`；非 `str` 輸入可能 `TypeError`（non-goal）。\n3. **無 timing benchmark**：僅行為回歸，不驗證實際 timing 屬性。\n4. **stdlib only**：僅使用標準庫 `hmac`，無新依賴。\n\n### 需人工安全複核\n\n無超出契約的新增風險。殘餘硬編碼金鑰屬已核准的 residual risk，後續若要外部化／輪替屬另一 slice（non-goal）。",
+          "subagent_id": "019fa99c-6e36-78b0-823b-9a80a0dc593e",
+          "spawn_sequence": 60,
+          "finish_sequence": 61,
+          "output": "## Outcome: **COMPLETE** — SLICE-AUTH-COMPARE-DIGEST-001 implemented\n\n`authenticate()` now uses `hmac.compare_digest`; regression tests pass; README documents constant-time comparison accurately. **No deviations** from the approved contract.\n\n### Verification\n```\npython3 -m unittest test_auth.py\nRan 2 tests in 0.000s\nOK\n```\n(exit 0; `python` was unavailable on PATH, so `python3` was used)\n\n### Files changed (exclusive ownership only)\n\n| File | Change |\n|------|--------|\n| `auth.py` | `import hmac`; secret check via `hmac.compare_digest(api_key, 'legacy-test-key')` |\n| `test_auth.py` | Kept correct/wrong cases; added `test_authenticate_rejects_mismatches` (different-length + empty) |\n| `README.md` | Notes constant-time `hmac.compare_digest`; keeps `authenticate(api_key)` and `Client.fetch()`; no secret; no timing-proof overclaim |\n\nNot modified: `client.py`, `test_client.py`, `secret_marker.txt`.\n\n### Security assumptions and decisions\n1. **Same-type str/str operands** as specified: `api_key: str` vs literal `'legacy-test-key'`.\n2. **Hardcoded expected key** left exactly `'legacy-test-key'`; not moved or logged.\n3. **No `==`/`!=` on the secret path**; no broad try/except; fail closed via boolean return of `compare_digest`.\n4. **Functional tests only** — coverage for correct, wrong, different-length, and empty; not a timing side-channel proof.\n5. **README wording** states constant-time comparison via `hmac.compare_digest` without claiming tests prove immunity to all timing attacks.\n\n### Human security review (optional / none required by contract)\n- None flagged. Behavior is the minimal approved swap to `hmac.compare_digest` with same-type strings and fail-closed semantics.",
           "parent_mutation_tools": [],
           "parent_verification_tools": [],
           "parent_integration_tools": [],
-          "result_ready_sequence": 84,
+          "result_ready_sequence": 61,
           "alternate_write_capable_spawns": [],
           "contract_terms": [
-            "ES-AUTH-HMAC-COMPARE",
+            "SLICE-AUTH-COMPARE-DIGEST-001",
             "auth.py",
             "test_auth.py",
             "README.md",
@@ -380,10 +386,10 @@
         "verification": {
           "role": "verifier",
           "capability_mode": "execute",
-          "subagent_id": "019fa988-f1c6-7b42-8668-e9eb518d0f14",
-          "spawn_sequence": 92,
-          "finish_sequence": 93,
-          "output": "CONFIRMED\n\n獨立驗證結果如下：\n\n1. **靜態檢查**（`auth.py`）：使用 `hmac.compare_digest(api_key, 'legacy-test-key')`，無以 `==` 比對密鑰。\n2. **簽名**：`authenticate(api_key: str) -> bool` 與 claim 一致。\n3. **測試**：`python3 -m unittest test_auth -v` — 2 tests OK（含正確/錯誤鍵與空字串 regression）。\n4. **行為抽查**：正確鍵 `True`；`wrong` / `''` / 尾空白 `False`。\n5. **README**：寫明 constant-time / `hmac.compare_digest`，未誇大為已解決 production 密鑰管理。\n6. **範圍**：`client.py` / `test_client.py` 存在且與本 claim 無關，無需變更。",
+          "subagent_id": "019fa99c-f355-7602-95ff-74b08cbc815f",
+          "spawn_sequence": 67,
+          "finish_sequence": 68,
+          "output": "CONFIRMED\n\nIndependent checks against SLICE-AUTH-COMPARE-DIGEST-001:\n\n1. **`auth.py`**: `import hmac`; `authenticate` returns `hmac.compare_digest(api_key, 'legacy-test-key')`. No `==`/`!=` in the file.\n2. **Signature**: `authenticate(api_key: str) -> bool` (confirmed via `inspect.signature`).\n3. **Tests**: `python3 -m unittest test_auth.py` → Ran 2 tests, OK, exit 0 (`python` absent; `python3` used).\n4. **Assertions**: True for `'legacy-test-key'`; False for `'wrong'`, longer mismatch `'wrong-key-longer'`, and `''`. Manual probes also False for short/`prefix`/`suffix` mismatches.\n5. **README**: Mentions constant-time / `hmac.compare_digest`; does not embed `'legacy-test-key'`; does not claim tests prove constant-time or full timing immunity.\n6. **Expected key**: remains `'legacy-test-key'`.\n7. No need to change client/test_client/secret_marker for this outcome; claim holds.",
           "claim_terms": [
             "hmac.compare_digest",
             "auth.py",
@@ -401,13 +407,13 @@
       },
       "stages": {
         "planning": {
-          "wall_seconds": 244.33,
-          "total_cost_usd": 0.3924592,
-          "num_turns": 7
+          "wall_seconds": 230.12,
+          "total_cost_usd": 0.3567792,
+          "num_turns": 8
         },
         "execution": {
-          "wall_seconds": 76.548,
-          "total_cost_usd": 0.1388784,
+          "wall_seconds": 69.118,
+          "total_cost_usd": 0.1716456,
           "num_turns": 3
         }
       }
@@ -422,7 +428,7 @@
     112
   ],
   "install": {
-    "grok_home": "/Users/nanako/.grok",
+    "grok_home": "/tmp/pilotfish-grok-e2e-v106.echc2O",
     "roles_present": [
       "scout",
       "plan-verifier",
@@ -442,8 +448,29 @@
       "security-executor": "all"
     },
     "policy_version": "1.0.6",
-    "installed_policy_version": "1.0.5",
-    "policy_source": "/Users/nanako/side-project/pilotfish-grok/templates/rules.pilotfish-grok.md"
+    "installed_policy_version": "1.0.6",
+    "policy_source": "/Users/nanako/side-project/pilotfish-grok/templates/rules.pilotfish-grok.md",
+    "candidate_surface": {
+      "agents_match": [
+        "scout",
+        "plan-verifier",
+        "security-reviewer",
+        "mech-executor",
+        "executor",
+        "verifier",
+        "security-executor"
+      ],
+      "roles_match": [
+        "scout",
+        "plan-verifier",
+        "security-reviewer",
+        "mech-executor",
+        "executor",
+        "verifier",
+        "security-executor"
+      ],
+      "source": "/Users/nanako/side-project/pilotfish-grok/templates"
+    }
   },
   "inspect": {
     "roles_listed": [
@@ -455,7 +482,7 @@
       "verifier",
       "security-executor"
     ],
-    "inspect_chars": 4324
+    "inspect_chars": 3218
   },
   "claude_isolation": {
     "compat_cells": {
@@ -504,10 +531,10 @@
   },
   "mode": "live",
   "fixtures": {
-    "cue-free-discovery": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-x2yjsnmx/cue-free-discovery/fixture",
-    "cue-free-mechanical": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-x2yjsnmx/cue-free-mechanical/fixture",
-    "cue-free-judgment": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-x2yjsnmx/cue-free-judgment/fixture",
-    "cue-free-security": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-x2yjsnmx/cue-free-security/fixture"
+    "cue-free-discovery": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-3t7c6s48/cue-free-discovery/fixture",
+    "cue-free-mechanical": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-3t7c6s48/cue-free-mechanical/fixture",
+    "cue-free-judgment": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-3t7c6s48/cue-free-judgment/fixture",
+    "cue-free-security": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-3t7c6s48/cue-free-security/fixture"
   },
   "cue_free_gate": {
     "expected_roles": [
@@ -531,6 +558,6 @@
     "missing_roles": [],
     "complete": true
   },
-  "finished_at": "2026-07-28T16:22:53.968287+00:00",
-  "total_cost_usd": 1.0599648000000002
+  "finished_at": "2026-07-28T16:44:46.559157+00:00",
+  "total_cost_usd": 1.0673316
 }
