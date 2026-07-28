@@ -708,13 +708,19 @@ def require_completed_role(
     )
     if not finish:
         raise AssertionError(f"{role} did not complete: {result['spawn_events']!r}")
+    expected = EXPECTED_CAPABILITY[role]
+    actual = spawn.get("capability_mode")
+    if actual != expected:
+        raise AssertionError(
+            f"{role} capability_mode {actual!r} != expected {expected!r}"
+        )
     if after_role:
         prior = require_completed_role(result, after_role)
         if spawn["sequence"] <= prior["finish_sequence"]:
             raise AssertionError(f"{role} started before {after_role} completed")
     return {
         "role": role,
-        "capability_mode": require_spawn(result, role)["capability_mode"],
+        "capability_mode": actual,
         "subagent_id": spawn.get("subagent_id"),
         "spawn_sequence": spawn["sequence"],
         "finish_sequence": finish["sequence"],
@@ -723,9 +729,14 @@ def require_completed_role(
 
 
 def require_role_owned_implementation(
-    result: dict[str, Any], role: str, *, after_sequence: int | None = None
+    result: dict[str, Any],
+    role: str,
+    *,
+    after_role: str | None = None,
+    after_sequence: int | None = None,
+    exclusive: bool = False,
 ) -> dict[str, Any]:
-    implementation = require_completed_role(result, role)
+    implementation = require_completed_role(result, role, after_role=after_role)
     parent_verification_tools = []
     parent_mutations = []
     for event in result["events"]:
@@ -748,8 +759,24 @@ def require_role_owned_implementation(
             f"parent session mutated repository work assigned to {role}: "
             f"{[(event['sequence'], event.get('tool')) for event in parent_mutations]!r}"
         )
+    alternate_executors = [
+        event
+        for event in result["events"]
+        if exclusive
+        and event.get("kind") == "spawned"
+        and event.get("sequence", -1) > (after_sequence or -1)
+        and event.get("capability_mode") == "all"
+        and event.get("subagent_type") != role
+    ]
+    if alternate_executors:
+        raise AssertionError(
+            f"{role} was not the exclusive write-capable role: "
+            f"{[event.get('subagent_type') for event in alternate_executors]!r}"
+        )
     implementation["parent_mutation_tools"] = []
     implementation["parent_verification_tools"] = parent_verification_tools
+    if exclusive:
+        implementation["alternate_write_capable_spawns"] = []
     return implementation
 
 
@@ -758,6 +785,8 @@ def is_unittest_command(raw_input: Any) -> bool:
         return False
     command = raw_input.get("command")
     if not isinstance(command, str):
+        return False
+    if any(separator in command for separator in ("\n", "\r", ";", "|", "`", "$(", ">", "<")):
         return False
     for part in command.split("&&"):
         try:
@@ -836,9 +865,17 @@ def cue_free_case_result(
 
 
 def is_confirmed(output: str) -> bool:
-    return re.search(
-        r"(?im)^\s*(?:#{1,6}\s*)?\*{0,2}CONFIRMED\b", output
-    ) is not None
+    leading = re.match(
+        r"(?i)^\s*(?:#{1,6}\s*)?\*{0,2}(CONFIRMED|REFUTED)\b", output
+    )
+    verdicts = re.findall(
+        r"(?im)^\s*(?:#{1,6}\s*)?\*{0,2}(CONFIRMED|REFUTED)\b", output
+    )
+    return (
+        leading is not None
+        and leading.group(1).upper() == "CONFIRMED"
+        and {verdict.upper() for verdict in verdicts} == {"CONFIRMED"}
+    )
 
 
 def git_status(fixture: Path) -> list[str]:
@@ -1304,7 +1341,9 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
     )
     assert_cue_free_prompt(prompt)
     result = run_grok_prompt(prompt, fixture, max_turns=20)
-    implementation = require_role_owned_implementation(result, "mech-executor")
+    implementation = require_role_owned_implementation(
+        result, "mech-executor", after_role="scout"
+    )
     verification = require_bound_verifier(
         result,
         after_role="mech-executor",
@@ -1317,14 +1356,21 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
         ),
     )
     diff = run_cmd(["git", "diff", "--"], cwd=fixture, timeout=30).stdout
-    if "validate_api_key" not in diff or re.search(r"^\+.*authenticate\b", diff, re.M):
+    remaining = run_cmd(
+        ["git", "grep", "-n", "authenticate"], cwd=fixture, timeout=30
+    )
+    if remaining.returncode not in {0, 1}:
+        raise AssertionError(
+            f"mechanical rename search failed: {remaining.stderr or remaining.stdout}"
+        )
+    if "validate_api_key" not in diff or remaining.stdout:
         raise AssertionError(f"mechanical rename was incomplete: {diff[:1600]}")
     assert_fixture_tests(fixture)
     case = cue_free_case_result(
         "cue-free-mechanical",
         prompt,
         result,
-        ("mech-executor", "verifier"),
+        ("scout", "mech-executor", "verifier"),
     )
     case["gate"] = {
         "implementation": implementation,
@@ -1350,7 +1396,7 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
             "test_client.py",
             "public API",
             "transient",
-            "3",
+            "bounded",
         ),
     )
     if not git_status(fixture):
@@ -1402,6 +1448,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
         result,
         "security-executor",
         after_sequence=native["exit_sequence"],
+        exclusive=True,
     )
     verification = require_bound_verifier(
         result,

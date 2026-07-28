@@ -133,6 +133,11 @@ class E2EDispatchTests(unittest.TestCase):
         for verdict in ("CONFIRMED", "**CONFIRMED**", "## **CONFIRMED**\nEvidence"):
             self.assertTrue(runner.is_confirmed(verdict))
         self.assertFalse(runner.is_confirmed("REFUTED"))
+        self.assertFalse(runner.is_confirmed("Evidence\nCONFIRMED"))
+        self.assertFalse(
+            runner.is_confirmed("REFUTED\nCONFIRMED behavior would require more")
+        )
+        self.assertFalse(runner.is_confirmed("CONFIRMED\nREFUTED by this probe"))
 
     def test_executor_ownership_and_verifier_claim_are_enforced(self) -> None:
         runner = load_runner_module()
@@ -195,6 +200,11 @@ class E2EDispatchTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "parent session mutated"):
             runner.require_role_owned_implementation(result, "executor")
         events[2]["raw_input"]["command"] = (
+            "python3 -m unittest\nsed -i old new client.py"
+        )
+        with self.assertRaisesRegex(AssertionError, "parent session mutated"):
+            runner.require_role_owned_implementation(result, "executor")
+        events[2]["raw_input"]["command"] = (
             "python3 -m unittest test_client.py -v"
         )
 
@@ -217,6 +227,69 @@ class E2EDispatchTests(unittest.TestCase):
             verification["claim_terms"],
             ["client.py", "test_client.py", "public API"],
         )
+
+    def test_completed_role_uses_its_own_capability(self) -> None:
+        runner = load_runner_module()
+        events = [
+            {
+                "kind": "spawned",
+                "sequence": 1,
+                "subagent_type": "executor",
+                "capability_mode": "all",
+                "subagent_id": "executor-first",
+            },
+            {
+                "kind": "spawned",
+                "sequence": 2,
+                "subagent_type": "executor",
+                "capability_mode": "read-only",
+                "subagent_id": "executor-completed",
+            },
+            {
+                "kind": "finished",
+                "sequence": 3,
+                "subagent_id": "executor-completed",
+                "status": "completed",
+                "output": "Implemented.",
+            },
+        ]
+        result = {"events": events, "spawn_events": events, "text": ""}
+        with self.assertRaisesRegex(AssertionError, "capability_mode"):
+            runner.require_completed_role(result, "executor")
+
+    def test_exclusive_executor_rejects_alternate_write_role(self) -> None:
+        runner = load_runner_module()
+        events = [
+            {
+                "kind": "spawned",
+                "sequence": 1,
+                "subagent_type": "mech-executor",
+                "capability_mode": "all",
+                "subagent_id": "alternate",
+            },
+            {
+                "kind": "spawned",
+                "sequence": 2,
+                "subagent_type": "security-executor",
+                "capability_mode": "all",
+                "subagent_id": "security",
+            },
+            {
+                "kind": "finished",
+                "sequence": 3,
+                "subagent_id": "security",
+                "status": "completed",
+                "output": "Implemented.",
+            },
+        ]
+        result = {"events": events, "spawn_events": events, "text": ""}
+        with self.assertRaisesRegex(AssertionError, "exclusive write-capable"):
+            runner.require_role_owned_implementation(
+                result,
+                "security-executor",
+                after_sequence=0,
+                exclusive=True,
+            )
 
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
@@ -675,7 +748,18 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertEqual(gate["write_capable_spawns"], [])
         self.assertTrue(gate["security_review"]["finished_before_readiness"])
         self.assertTrue(gate["resumed_after_user_continuation"])
+        self.assertEqual(
+            gate["implementation"]["alternate_write_capable_spawns"], []
+        )
         runner.assert_large_ready_units(gate)
+        self.assertEqual(
+            cases["cue-free-mechanical"]["expected_roles"],
+            ["scout", "mech-executor", "verifier"],
+        )
+        self.assertIn(
+            "bounded",
+            cases["cue-free-judgment"]["gate"]["verification"]["claim_terms"],
+        )
         for case_name in (
             "cue-free-mechanical",
             "cue-free-judgment",
