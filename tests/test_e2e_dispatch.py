@@ -376,6 +376,15 @@ class E2EDispatchTests(unittest.TestCase):
             self.assertEqual(runner.git_status(fixture), [])
             self.assertNotEqual(runner.source_snapshot(fixture), before)
 
+    def test_harness_owned_behavior_probes_reject_baseline_fixture(self) -> None:
+        runner = load_runner_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = runner.make_fixture(Path(tmp))
+            with self.assertRaisesRegex(AssertionError, "bounded-transient-retry"):
+                runner.assert_retry_behavior(fixture)
+            with self.assertRaisesRegex(AssertionError, "does not use compare_digest"):
+                runner.assert_security_behavior(fixture)
+
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
         updates = [
@@ -857,6 +866,12 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertIn(
             "bounded",
             cases["cue-free-judgment"]["gate"]["verification"]["claim_terms"],
+        )
+        self.assertTrue(
+            cases["cue-free-judgment"]["gate"]["behavior_probe"]["passed"]
+        )
+        self.assertTrue(
+            cases["cue-free-security"]["gate"]["behavior_probe"]["passed"]
         )
         for case_name in (
             "cue-free-mechanical",

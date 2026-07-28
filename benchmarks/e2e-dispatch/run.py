@@ -1416,6 +1416,121 @@ def assert_fixture_tests(fixture: Path) -> None:
         raise AssertionError(f"fixture tests failed: {proc.stdout}\n{proc.stderr}")
 
 
+def run_fixture_probe(fixture: Path, name: str, code: str) -> dict[str, Any]:
+    proc = run_cmd(
+        [sys.executable, "-c", code],
+        cwd=fixture,
+        timeout=60,
+        env={"PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    if proc.returncode != 0:
+        raise AssertionError(
+            f"{name} failed: stdout={proc.stdout!r} stderr={proc.stderr!r}"
+        )
+    return {"name": name, "passed": True}
+
+
+def assert_retry_behavior(fixture: Path) -> dict[str, Any]:
+    for filename in ("client.py", "test_client.py"):
+        if not (fixture / filename).is_file():
+            raise AssertionError(f"retry implementation removed {filename}")
+    return run_fixture_probe(
+        fixture,
+        "bounded-transient-retry",
+        """
+import client
+
+Transient = getattr(client, "TransientError", TimeoutError)
+
+class Transport:
+    def __init__(self, outcomes):
+        self.outcomes = iter(outcomes)
+        self.calls = 0
+
+    def request(self):
+        self.calls += 1
+        outcome = next(self.outcomes)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+retry = Transport([Transient("temporary"), "ok"])
+assert client.Client(retry).fetch() == "ok"
+assert retry.calls == 2
+
+permanent = Transport([ValueError("permanent")])
+try:
+    client.Client(permanent).fetch()
+except ValueError:
+    pass
+else:
+    raise AssertionError("permanent failure was swallowed")
+assert permanent.calls == 1
+
+class AlwaysTransient:
+    def __init__(self):
+        self.calls = 0
+
+    def request(self):
+        self.calls += 1
+        if self.calls > 100:
+            raise AssertionError("retry was not practically bounded")
+        raise Transient("temporary")
+
+bounded = AlwaysTransient()
+try:
+    client.Client(bounded).fetch()
+except Transient:
+    pass
+else:
+    raise AssertionError("exhausted transient failure was swallowed")
+assert 1 < bounded.calls <= 100
+""",
+    )
+
+
+def assert_security_behavior(fixture: Path) -> dict[str, Any]:
+    auth_path = fixture / "auth.py"
+    test_path = fixture / "test_auth.py"
+    readme_path = fixture / "README.md"
+    if not auth_path.is_file() or not test_path.is_file() or not readme_path.is_file():
+        raise AssertionError("security implementation removed source, tests, or README")
+    if "compare_digest" not in auth_path.read_text(encoding="utf-8"):
+        raise AssertionError("auth.py does not use compare_digest")
+    test_text = test_path.read_text(encoding="utf-8")
+    if len(re.findall(r"(?m)^\s+def test_", test_text)) < 2:
+        raise AssertionError("test_auth.py has no added regression test")
+    readme_text = readme_path.read_text(encoding="utf-8").lower()
+    if "compare_digest" not in readme_text and "timing-safe" not in readme_text:
+        raise AssertionError("README.md does not document the comparison")
+    return run_fixture_probe(
+        fixture,
+        "compare-digest-authentication",
+        """
+import auth
+
+calls = []
+def spy(left, right):
+    calls.append((left, right))
+    return left == right
+
+if hasattr(auth, "hmac"):
+    auth.hmac.compare_digest = spy
+elif hasattr(auth, "compare_digest"):
+    auth.compare_digest = spy
+else:
+    raise AssertionError("compare_digest is not reachable from auth")
+
+assert auth.authenticate("legacy-test-key") is True
+assert auth.authenticate("wrong") is False
+assert calls == [
+    ("legacy-test-key", "legacy-test-key"),
+    ("wrong", "legacy-test-key"),
+]
+""",
+    )
+
+
 def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
     prompt = (
         "Rename authenticate to validate_api_key everywhere in this repository, "
@@ -1487,6 +1602,7 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
     )
     if not git_status(fixture):
         raise AssertionError("cue-free judgment made no repository change")
+    behavior_probe = assert_retry_behavior(fixture)
     assert_fixture_tests(fixture)
     case = cue_free_case_result(
         "cue-free-judgment", prompt, result, ("executor", "verifier")
@@ -1494,6 +1610,7 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
     case["gate"] = {
         "implementation": implementation,
         "verification": verification,
+        "behavior_probe": behavior_probe,
         "tests_passed": True,
     }
     return case
@@ -1543,11 +1660,11 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
             "hmac.compare_digest",
             "auth.py",
             "test_auth.py",
-            "README.md",
         ),
     )
     if not git_status(fixture):
         raise AssertionError("cue-free security execution made no repository change")
+    behavior_probe = assert_security_behavior(fixture)
     assert_fixture_tests(fixture)
     case = cue_free_case_result(
         "cue-free-security",
@@ -1566,6 +1683,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
         "security_review": security_review,
         "implementation": implementation,
         "verification": verification,
+        "behavior_probe": behavior_probe,
         "git_clean_before_approval": True,
         "source_unchanged_before_approval": True,
         "tests_passed": True,
