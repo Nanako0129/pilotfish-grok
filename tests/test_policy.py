@@ -73,6 +73,28 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertIn("unattended run must stop", gate_text)
 
+    def test_security_execution_gate_is_front_loaded_and_fail_closed(self) -> None:
+        policy = POLICY.read_text(encoding="utf-8")
+        security_gate = "Every approved readiness unit identified as security-sensitive"
+        main_policy = "Main-session policy for Grok Build"
+
+        self.assertLess(policy.index("### Non-negotiable native Plan gate"), policy.index(security_gate))
+        self.assertLess(policy.index(security_gate), policy.index(main_policy))
+        gate_text = " ".join(
+            policy[policy.index(security_gate) : policy.index(main_policy)].split()
+        )
+        for phrase in (
+            "including any unit reviewed by `security-reviewer`",
+            "Before any post-approval source mutation or implementation tool call, "
+            "the main session MUST successfully spawn `security-executor`",
+            "every role other than `security-executor` MUST NOT implement that unit directly",
+            "direct-work allowance, dispatch brake, coordination-cost heuristic, "
+            "matching-role-optional rule, and single-unknown-bug exception do not waive",
+            "If the spawn is unavailable or fails, stop without source mutation "
+            "or implementation tools",
+        ):
+            self.assertIn(phrase, gate_text)
+
     def test_native_plan_lifecycle_requires_readiness_before_exit(self) -> None:
         policy = POLICY.read_text(encoding="utf-8")
         lifecycle = policy[policy.index("| Discovery |") : policy.index("### Dispatch")]

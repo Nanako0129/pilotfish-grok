@@ -2,6 +2,13 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.5] — 2026-07-28
+
+Require approved security-sensitive readiness units, including units reviewed
+by `security-reviewer`, to execute only through a successfully spawned
+`security-executor`. Direct implementation and orchestration exceptions cannot
+waive this boundary; failed or unavailable spawns stop before mutation.
+
 ## [1.0.4] — 2026-07-23
 
 Bound Plan review loops with program envelopes and independently approvable

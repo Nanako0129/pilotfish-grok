@@ -1,5 +1,5 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.4 -->
+<!-- pilotfish-grok v1.0.5 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
@@ -49,6 +49,16 @@ request, or a request to skip planning, skip approval, start immediately, or
 continue until files change, does not waive this gate. Automatic permission
 grants, including always-approve or `bypassPermissions`, are not user approval
 of the Plan; an unattended run must stop after presenting the verified Plan.
+
+Every approved readiness unit identified as security-sensitive, including any
+unit reviewed by `security-reviewer`, has a mandatory execution boundary.
+Before any post-approval source mutation or implementation tool call, the main
+session MUST successfully spawn `security-executor` with the approved stable
+contract. The main session and every role other than `security-executor` MUST
+NOT implement that unit directly. The direct-work allowance, dispatch brake,
+coordination-cost heuristic, matching-role-optional rule, and single-unknown-bug
+exception do not waive this boundary. If the spawn is unavailable or fails,
+stop without source mutation or implementation tools.
 
 Main-session policy for Grok Build. If you are running as a subagent role
 (`scout`, `plan-verifier`, `security-reviewer`, `mech-executor`, `executor`,
