@@ -62,10 +62,12 @@ latency benchmark.
 
 The original v1.0.3 record ran before Claude compatibility isolation was added
 and is retained in the research report only as contaminated historical
-evidence. The accepted `results.json` is fresh monolithic run
-`ad46a576-544b-4a97-8379-026893b732c3`: all six cases passed in 593.745
-seconds of aggregate case time with `$0.8523472` in client cost fields, after
-both persistent and per-process isolation gates passed.
+evidence. The accepted v1.0.5 `results.json` is case-complete run set
+`f3a7a889-31b1-4aa0-9052-021a312d8014`: all six cases passed in 765.124
+seconds of aggregate case time with `$1.205134` in client cost fields, after
+both persistent and per-process isolation gates passed. The component run IDs
+are recorded in the artifact; cases were split after policy-compliant
+two-`REVISE` pauses so completed expensive cases were not discarded.
 
 Headless `grok -p` disconnects when `exit_plan_mode` reaches the interactive
 approval surface. A passing headless case therefore requires the ordered exit

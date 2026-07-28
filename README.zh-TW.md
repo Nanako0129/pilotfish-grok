@@ -142,7 +142,7 @@ flowchart LR
 | **Execution** | 穩定 contract、獨佔 ownership、done criteria | `mech-executor` / `executor` / `security-executor` |
 | **Verification** | 可被推翻的完成宣稱 | fresh `verifier` → `CONFIRMED` / `REFUTED` |
 
-單一未知 bug 的診斷、第一次修復與現場驗證若共用同一條證據鏈，留在主 session——不要拆成 `scout` → `executor` 管線。
+對非資安敏感工作，單一未知 bug 的診斷、第一次修復與現場驗證若共用同一條證據鏈，留在主 session——不要拆成 `scout` → `executor` 管線。
 
 ## 安裝
 
@@ -151,7 +151,7 @@ flowchart LR
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.4 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

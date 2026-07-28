@@ -161,9 +161,9 @@ flowchart LR
 | **Execution** | Stable contract with exclusive ownership and done criteria | `mech-executor` / `executor` / `security-executor` |
 | **Verification** | Concrete claim to refute | Fresh `verifier` → `CONFIRMED` / `REFUTED` |
 
-A single unknown bug's diagnosis, first fix, and live check stay in the main
-session when they share one evidence chain—do not turn that into a sequential
-`scout` → `executor` pipeline.
+For non-security-sensitive work, a single unknown bug's diagnosis, first fix,
+and live check stay in the main session when they share one evidence chain—do
+not turn that into a sequential `scout` → `executor` pipeline.
 
 ## Install
 
@@ -172,7 +172,7 @@ session when they share one evidence chain—do not turn that into a sequential
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.4 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
