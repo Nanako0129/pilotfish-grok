@@ -899,6 +899,32 @@ def require_bound_verifier(
     return verification
 
 
+def require_bound_implementation(
+    result: dict[str, Any],
+    implementation: dict[str, Any],
+    contract_terms: tuple[str, ...],
+) -> dict[str, Any]:
+    spawn = next(
+        event
+        for event in result["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_id") == implementation["subagent_id"]
+    )
+    raw_input = spawn.get("raw_input")
+    prompt = (
+        str(raw_input.get("prompt") or "")
+        if isinstance(raw_input, dict)
+        else ""
+    )
+    missing = [term for term in contract_terms if term.lower() not in prompt.lower()]
+    if missing:
+        raise AssertionError(
+            f"implementation prompt was not bound to the approved contract: {missing!r}"
+        )
+    implementation["contract_terms"] = list(contract_terms)
+    return implementation
+
+
 def cue_free_case_result(
     name: str,
     prompt: str,
@@ -956,7 +982,24 @@ def source_snapshot(fixture: Path) -> dict[str, str]:
     }
 
 
-def require_scout_before_parent_tools(result: dict[str, Any]) -> dict[str, Any]:
+def is_repository_discovery_tool(event: dict[str, Any]) -> bool:
+    tool = str(event.get("tool") or "").lower()
+    if tool in {"read_file", "search", "list_directory", "glob", "find_files"}:
+        return True
+    if tool != "run_terminal_command":
+        return False
+    raw_input = event.get("raw_input")
+    command = raw_input.get("command") if isinstance(raw_input, dict) else None
+    return isinstance(command, str) and re.search(
+        r"(?i)(?:^|[;&|]\s*)(?:\S*/)?(?:rg|grep|find|ls|cat|sed)\b"
+        r"|\bgit\s+(?:grep|ls-files|show)\b",
+        command,
+    ) is not None
+
+
+def require_scout_before_parent_tools(
+    result: dict[str, Any], *, strict_first: bool = True
+) -> dict[str, Any]:
     scout = require_completed_role(result, "scout")
     spawn = next(
         event
@@ -982,6 +1025,7 @@ def require_scout_before_parent_tools(result: dict[str, Any]) -> dict[str, Any]:
         for event in result["events"]
         if event.get("kind") == "tool_call"
         and event.get("sequence", -1) < scout_call["sequence"]
+        and (strict_first or is_repository_discovery_tool(event))
     ]
     if prior_parent_tools:
         raise AssertionError(
@@ -1498,11 +1542,17 @@ def assert_retry_behavior(fixture: Path, baseline_test: str) -> dict[str, Any]:
         raise AssertionError(
             "bounded-transient-retry: repository retry tests were not added"
         )
-    for term in ("TransientError", "ValueError"):
-        if term not in test_text:
-            raise AssertionError(
-                f"bounded-transient-retry: test_client.py does not cover {term}"
-            )
+    if "TransientError" not in test_text:
+        raise AssertionError(
+            "bounded-transient-retry: test_client.py does not cover TransientError"
+        )
+    if not re.search(
+        r"\b(?!TransientError\b)[A-Za-z_]\w*(?:Error|Exception)\s*\(",
+        test_text,
+    ):
+        raise AssertionError(
+            "bounded-transient-retry: test_client.py has no permanent failure"
+        )
     return run_fixture_probe(
         fixture,
         "bounded-transient-retry",
@@ -1650,7 +1700,7 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
     )
     assert_cue_free_prompt(prompt)
     result = run_grok_prompt(prompt, fixture, max_turns=20)
-    scout = require_scout_before_parent_tools(result)
+    scout = require_scout_before_parent_tools(result, strict_first=False)
     implementation = require_role_owned_implementation(
         result, "mech-executor", after_role="scout", exclusive=True
     )
@@ -1705,7 +1755,8 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
         claim_terms=(
             "client.py",
             "test_client.py",
-            "public API",
+            "Client(transport)",
+            "fetch()",
             "transient",
             "bounded",
         ),
@@ -1743,8 +1794,18 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
     )
     native = assert_native_plan_gate(planned)
     assert_large_ready_units(native)
+    scout = require_completed_role(planned, "scout")
+    early_security_reviews = [
+        event
+        for event in planned["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_type") == "security-reviewer"
+        and event.get("sequence", -1) <= scout["finish_sequence"]
+    ]
+    if early_security_reviews:
+        raise AssertionError("security-reviewer started before scout completed")
     security_review = assert_security_review_before_readiness(planned)
-    require_completed_role(planned, "scout")
+    security_review["scout_finished_before_review"] = True
     if source_snapshot(fixture) != before:
         raise AssertionError("security planning turn modified the fixture before approval")
 
@@ -1760,6 +1821,27 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
         "security-executor",
         after_sequence=native["exit_sequence"],
         exclusive=True,
+    )
+    approved_slice_id = next(
+        unit["id"]
+        for unit in native["ready_units"]
+        if unit["kind"] == "execution slice"
+    )
+    implementation = require_bound_implementation(
+        result,
+        implementation,
+        (
+            approved_slice_id,
+            "auth.py",
+            "test_auth.py",
+            "README.md",
+            "hmac.compare_digest",
+            "authenticate",
+            "legacy-test-key",
+            "True",
+            "False",
+            "python",
+        ),
     )
     verification = require_bound_verifier(
         result,

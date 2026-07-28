@@ -152,6 +152,9 @@ class E2EDispatchTests(unittest.TestCase):
                 "subagent_type": "executor",
                 "capability_mode": "all",
                 "subagent_id": "executor-1",
+                "raw_input": {
+                    "prompt": "Implement approved SLICE-test in client.py."
+                },
             },
             {
                 "kind": "finished",
@@ -198,6 +201,21 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertEqual(
             implementation["parent_verification_tools"],
             ["run_terminal_command"],
+        )
+        with self.assertRaisesRegex(AssertionError, "approved contract"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "client.py", "test_client.py"),
+            )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "client.py"),
+        )
+        self.assertEqual(
+            implementation["contract_terms"],
+            ["SLICE-test", "client.py"],
         )
 
         events[2]["raw_input"]["command"] += " && sed -i old new client.py"
@@ -401,6 +419,22 @@ class E2EDispatchTests(unittest.TestCase):
         result = {"events": events, "spawn_events": events, "text": ""}
         with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
             runner.require_scout_before_parent_tools(result)
+        with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
+            runner.require_scout_before_parent_tools(result, strict_first=False)
+
+        events[0].update(
+            {
+                "tool": "run_terminal_command",
+                "read_only": False,
+                "raw_input": {"command": "python3 -m unittest"},
+            }
+        )
+        scout = runner.require_scout_before_parent_tools(
+            result, strict_first=False
+        )
+        self.assertEqual(scout["parent_tools_before_scout"], [])
+        with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
+            runner.require_scout_before_parent_tools(result)
 
         events[0]["sequence"] = 5
         scout = runner.require_scout_before_parent_tools(result)
@@ -448,6 +482,39 @@ class E2EDispatchTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "does not use compare_digest"):
                 runner.assert_security_behavior(fixture)
 
+            (fixture / "client.py").write_text(
+                "class TransientError(Exception):\n"
+                "    pass\n\n"
+                "class Client:\n"
+                "    def __init__(self, transport):\n"
+                "        self.transport = transport\n\n"
+                "    def fetch(self):\n"
+                "        for attempt in range(2):\n"
+                "            try:\n"
+                "                return self.transport.request()\n"
+                "            except TransientError:\n"
+                "                if attempt == 1:\n"
+                "                    raise\n",
+                encoding="utf-8",
+            )
+            (fixture / "test_client.py").write_text(
+                "import unittest\n"
+                "from client import Client, TransientError\n\n"
+                "class RetryTest(unittest.TestCase):\n"
+                "    def test_success(self):\n"
+                "        self.assertTrue(Client)\n\n"
+                "    def test_retry(self):\n"
+                "        self.assertTrue(TransientError)\n\n"
+                "    def test_exhaustion(self):\n"
+                "        self.assertTrue(TransientError)\n\n"
+                "    def test_permanent(self):\n"
+                "        self.assertTrue(RuntimeError('permanent'))\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                runner.assert_retry_behavior(fixture, baseline_test)["passed"]
+            )
+
             for filename in ("auth.py", "test_auth.py", "README.md"):
                 path = fixture / filename
                 path.write_text(
@@ -463,7 +530,14 @@ class E2EDispatchTests(unittest.TestCase):
             )
             self.assertEqual(
                 subprocess.run(
-                    ["git", "diff", "--"],
+                    [
+                        "git",
+                        "diff",
+                        "--",
+                        "auth.py",
+                        "test_auth.py",
+                        "README.md",
+                    ],
                     cwd=fixture,
                     check=True,
                     capture_output=True,
@@ -980,10 +1054,21 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertEqual(gate["parent_mutation_tools"], [])
         self.assertEqual(gate["write_capable_spawns"], [])
         self.assertTrue(gate["security_review"]["finished_before_readiness"])
+        self.assertTrue(
+            gate["security_review"]["scout_finished_before_review"]
+        )
         self.assertTrue(gate["resumed_after_user_continuation"])
         self.assertEqual(
             gate["implementation"]["alternate_write_capable_spawns"], []
         )
+        for term in (
+            "auth.py",
+            "test_auth.py",
+            "README.md",
+            "hmac.compare_digest",
+            "legacy-test-key",
+        ):
+            self.assertIn(term, gate["implementation"]["contract_terms"])
         runner.assert_large_ready_units(gate)
         self.assertEqual(
             cases["cue-free-mechanical"]["expected_roles"],
