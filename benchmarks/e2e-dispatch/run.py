@@ -949,12 +949,30 @@ def source_snapshot(fixture: Path) -> dict[str, str]:
 
 def require_scout_before_parent_tools(result: dict[str, Any]) -> dict[str, Any]:
     scout = require_completed_role(result, "scout")
+    spawn = next(
+        event
+        for event in result["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_id") == scout["subagent_id"]
+    )
+    scout_call = next(
+        (
+            event
+            for event in reversed(result["events"])
+            if event.get("kind") == "tool_call"
+            and event.get("tool") == "spawn_subagent"
+            and event.get("raw_input") == spawn.get("raw_input")
+            and event.get("sequence", -1) < scout["spawn_sequence"]
+        ),
+        None,
+    )
+    if not scout_call:
+        raise AssertionError("scout spawn tool call was not persisted")
     prior_parent_tools = [
         event
         for event in result["events"]
         if event.get("kind") == "tool_call"
-        and event.get("tool") != "spawn_subagent"
-        and event.get("sequence", -1) < scout["spawn_sequence"]
+        and event.get("sequence", -1) < scout_call["sequence"]
     ]
     if prior_parent_tools:
         raise AssertionError(
@@ -962,6 +980,7 @@ def require_scout_before_parent_tools(result: dict[str, Any]) -> dict[str, Any]:
             f"{[event.get('tool') for event in prior_parent_tools]!r}"
         )
     scout["parent_tools_before_scout"] = []
+    scout["spawn_tool_sequence"] = scout_call["sequence"]
     return scout
 
 
@@ -1430,17 +1449,29 @@ def run_fixture_probe(fixture: Path, name: str, code: str) -> dict[str, Any]:
     return {"name": name, "passed": True}
 
 
-def assert_retry_behavior(fixture: Path) -> dict[str, Any]:
+def assert_retry_behavior(fixture: Path, baseline_test: str) -> dict[str, Any]:
     for filename in ("client.py", "test_client.py"):
         if not (fixture / filename).is_file():
             raise AssertionError(f"retry implementation removed {filename}")
+    test_text = (fixture / "test_client.py").read_text(encoding="utf-8")
+    if test_text == baseline_test or len(
+        re.findall(r"(?m)^\s+def test_", test_text)
+    ) < 4:
+        raise AssertionError(
+            "bounded-transient-retry: repository retry tests were not added"
+        )
+    for term in ("TransientError", "ValueError"):
+        if term not in test_text:
+            raise AssertionError(
+                f"bounded-transient-retry: test_client.py does not cover {term}"
+            )
     return run_fixture_probe(
         fixture,
         "bounded-transient-retry",
         """
 import client
 
-Transient = getattr(client, "TransientError", TimeoutError)
+Transient = client.TransientError
 
 class Transport:
     def __init__(self, outcomes):
@@ -1485,6 +1516,35 @@ except Transient:
 else:
     raise AssertionError("exhausted transient failure was swallowed")
 assert 1 < bounded.calls <= 100
+""",
+    )
+
+
+def assert_rename_behavior(fixture: Path) -> dict[str, Any]:
+    paths = [fixture / name for name in ("auth.py", "test_auth.py", "README.md")]
+    if any(not path.is_file() for path in paths):
+        raise AssertionError("mechanical rename removed source, tests, or README")
+    texts = [path.read_text(encoding="utf-8") for path in paths]
+    if any("validate_api_key" not in text for text in texts):
+        raise AssertionError("mechanical rename is absent from a required tracked file")
+    remaining = run_cmd(
+        ["git", "grep", "-n", "authenticate"], cwd=fixture, timeout=30
+    )
+    if remaining.returncode not in {0, 1}:
+        raise AssertionError(
+            f"mechanical rename search failed: {remaining.stderr or remaining.stdout}"
+        )
+    if remaining.stdout:
+        raise AssertionError(f"mechanical rename left old symbols: {remaining.stdout}")
+    return run_fixture_probe(
+        fixture,
+        "rename-preserves-authentication",
+        """
+from auth import validate_api_key
+
+assert validate_api_key("legacy-test-key") is True
+for candidate in ("wrong", "", "legacy-test-keX", "anything-else"):
+    assert validate_api_key(candidate) is False
 """,
     )
 
@@ -1553,16 +1613,7 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
             "behavior",
         ),
     )
-    diff = run_cmd(["git", "diff", "--"], cwd=fixture, timeout=30).stdout
-    remaining = run_cmd(
-        ["git", "grep", "-n", "authenticate"], cwd=fixture, timeout=30
-    )
-    if remaining.returncode not in {0, 1}:
-        raise AssertionError(
-            f"mechanical rename search failed: {remaining.stderr or remaining.stdout}"
-        )
-    if "validate_api_key" not in diff or remaining.stdout:
-        raise AssertionError(f"mechanical rename was incomplete: {diff[:1600]}")
+    behavior_probe = assert_rename_behavior(fixture)
     assert_fixture_tests(fixture)
     case = cue_free_case_result(
         "cue-free-mechanical",
@@ -1574,6 +1625,7 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
         "discovery": scout,
         "implementation": implementation,
         "verification": verification,
+        "behavior_probe": behavior_probe,
         "tests_passed": True,
     }
     return case
@@ -1581,10 +1633,13 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
 
 def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
     prompt = (
-        "Add bounded retry handling to this client. Preserve the public API, "
-        "retry transient failures only, and cover the behavior with tests."
+        "Add bounded retry handling in client.py and cover it in test_client.py. "
+        "Export TransientError as the only retryable failure, preserve "
+        "Client(transport) and fetch(), and test transient success, exhaustion, "
+        "and immediate permanent failure."
     )
     assert_cue_free_prompt(prompt)
+    baseline_test = (fixture / "test_client.py").read_text(encoding="utf-8")
     result = run_grok_prompt(prompt, fixture, max_turns=24)
     implementation = require_role_owned_implementation(
         result, "executor", exclusive=True
@@ -1600,9 +1655,7 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
             "bounded",
         ),
     )
-    if not git_status(fixture):
-        raise AssertionError("cue-free judgment made no repository change")
-    behavior_probe = assert_retry_behavior(fixture)
+    behavior_probe = assert_retry_behavior(fixture, baseline_test)
     assert_fixture_tests(fixture)
     case = cue_free_case_result(
         "cue-free-judgment", prompt, result, ("executor", "verifier")
@@ -1662,8 +1715,6 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
             "test_auth.py",
         ),
     )
-    if not git_status(fixture):
-        raise AssertionError("cue-free security execution made no repository change")
     behavior_probe = assert_security_behavior(fixture)
     assert_fixture_tests(fixture)
     case = cue_free_case_result(

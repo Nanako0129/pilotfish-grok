@@ -128,6 +128,7 @@ class PolicyTests(unittest.TestCase):
             "do not select `mech-executor` or `executor` for it",
             "spawn `scout` before any repository search that must locate an unknown file",
             "the first tool must spawn `scout`",
+            "the first tool after mandatory `enter_plan_mode`",
             "must not search or read the repository first",
             "`scout` must finish before `mech-executor` starts",
             "For non-security work, spawn `mech-executor` before a fully specified",

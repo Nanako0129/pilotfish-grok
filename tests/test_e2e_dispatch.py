@@ -329,6 +329,10 @@ class E2EDispatchTests(unittest.TestCase):
 
     def test_scout_must_precede_parent_repository_tools(self) -> None:
         runner = load_runner_module()
+        scout_input = {
+            "subagent_type": "scout",
+            "description": "Find the marker",
+        }
         events = [
             {
                 "kind": "tool_call",
@@ -337,15 +341,22 @@ class E2EDispatchTests(unittest.TestCase):
                 "read_only": True,
             },
             {
-                "kind": "spawned",
+                "kind": "tool_call",
                 "sequence": 2,
+                "tool": "spawn_subagent",
+                "raw_input": scout_input,
+            },
+            {
+                "kind": "spawned",
+                "sequence": 3,
                 "subagent_type": "scout",
                 "capability_mode": "read-only",
                 "subagent_id": "scout-1",
+                "raw_input": scout_input,
             },
             {
                 "kind": "finished",
-                "sequence": 3,
+                "sequence": 4,
                 "subagent_id": "scout-1",
                 "status": "completed",
                 "output": "Found it.",
@@ -355,9 +366,22 @@ class E2EDispatchTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
             runner.require_scout_before_parent_tools(result)
 
-        events[0]["sequence"] = 4
+        events[0]["sequence"] = 5
         scout = runner.require_scout_before_parent_tools(result)
         self.assertEqual(scout["parent_tools_before_scout"], [])
+        self.assertEqual(scout["spawn_tool_sequence"], 2)
+
+        events.insert(
+            0,
+            {
+                "kind": "tool_call",
+                "sequence": 1,
+                "tool": "spawn_subagent",
+                "raw_input": {"subagent_type": "verifier"},
+            },
+        )
+        with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
+            runner.require_scout_before_parent_tools(result)
 
     def test_source_snapshot_ignores_git_index_hiding(self) -> None:
         runner = load_runner_module()
@@ -380,10 +404,38 @@ class E2EDispatchTests(unittest.TestCase):
         runner = load_runner_module()
         with tempfile.TemporaryDirectory() as tmp:
             fixture = runner.make_fixture(Path(tmp))
-            with self.assertRaisesRegex(AssertionError, "bounded-transient-retry"):
-                runner.assert_retry_behavior(fixture)
+            baseline_test = (fixture / "test_client.py").read_text(encoding="utf-8")
+            with self.assertRaisesRegex(AssertionError, "repository retry tests"):
+                runner.assert_retry_behavior(fixture, baseline_test)
+            with self.assertRaisesRegex(AssertionError, "mechanical rename"):
+                runner.assert_rename_behavior(fixture)
             with self.assertRaisesRegex(AssertionError, "does not use compare_digest"):
                 runner.assert_security_behavior(fixture)
+
+            for filename in ("auth.py", "test_auth.py", "README.md"):
+                path = fixture / filename
+                path.write_text(
+                    path.read_text(encoding="utf-8").replace(
+                        "authenticate", "validate_api_key"
+                    ),
+                    encoding="utf-8",
+                )
+            subprocess.run(
+                ["git", "add", "auth.py", "test_auth.py", "README.md"],
+                cwd=fixture,
+                check=True,
+            )
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "diff", "--"],
+                    cwd=fixture,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout,
+                "",
+            )
+            self.assertTrue(runner.assert_rename_behavior(fixture)["passed"])
 
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
@@ -866,6 +918,9 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertIn(
             "bounded",
             cases["cue-free-judgment"]["gate"]["verification"]["claim_terms"],
+        )
+        self.assertTrue(
+            cases["cue-free-mechanical"]["gate"]["behavior_probe"]["passed"]
         )
         self.assertTrue(
             cases["cue-free-judgment"]["gate"]["behavior_probe"]["passed"]

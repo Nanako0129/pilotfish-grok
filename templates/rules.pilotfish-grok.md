@@ -108,7 +108,9 @@ to name a role:
   search that must locate an unknown file or symbol, or any broad or cross-file
   reconnaissance.
 - For an exact-text lookup whose file path is unknown, the first tool must spawn
-  `scout`; the main session must not search or read the repository first.
+  `scout`; when the Plan gate applies, this means the first tool after mandatory
+  `enter_plan_mode`. The main session must not search or read the repository
+  first.
 - Treat a repository-wide rename across source, tests, and documentation as
   cross-file reconnaissance: `scout` must finish before `mech-executor` starts.
 - For non-security work, spawn `mech-executor` before a fully specified
