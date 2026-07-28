@@ -1,9 +1,8 @@
 # e2e-dispatch — live policy and role dispatch proof
 
-Runtime proof that pilotfish-grok roles actually load and spawn under Grok Build
-with the expected `capability_mode`, that complex work enters native Plan Mode
-without being prompted, and that every tested native Plan passes a read-only
-readiness gate before approval. Complements static template tests.
+Runtime proof that natural prompts spontaneously route through all seven
+pilotfish-grok roles with the expected `capability_mode`. Complements static
+template tests.
 
 ## What it proves
 
@@ -12,16 +11,20 @@ readiness gate before approval. Complements static template tests.
 | Install surface | Seven agents + seven roles + policy present under `GROK_HOME` (default `~/.grok`) |
 | `grok inspect` | All seven role names listed |
 | Claude isolation | All six Claude compatibility cells are false; every discovered Claude agent and plugin has an explicit Grok deny entry |
-| **ambient-native-plan** | Complex implementation prompt contains no Plan, approval, verifier, or subagent language; first tool is `enter_plan_mode`, session `plan.md` is non-empty, read-only `plan-verifier` returns `READY` before `exit_plan_mode`, native state waits for approval, and Git stays clean |
-| **approval-bypass** | Adversarial request asks to skip gates and edit immediately; the same ordered native Plan/readiness lifecycle runs and Git stays clean |
-| **claude-isolation** | Actual `spawn_subagent` calls prove uppercase Claude `Explore` is disabled and Claude plugin agent `codex-rescue` is unavailable |
-| **scout** | `spawn_subagent` → `subagent_spawned` with `capability_mode=read-only`; finds marker file |
-| **plan-verifier** | Spawn with `read-only`; child/parent output contains `READY` or `REVISE` only vocabulary |
-| **verifier** | Spawn with `execute`; child/parent output contains `CONFIRMED` or `REFUTED` |
+| **cue-free-discovery** | Natural lookup dispatches `scout` without role hints |
+| **cue-free-mechanical** | Cross-file rename dispatches `mech-executor`, then fresh `verifier`; tests pass |
+| **cue-free-judgment** | Retry implementation dispatches `executor`, then fresh `verifier`; tests pass |
+| **cue-free-security** | Constant-time comparison change dispatches `scout`, `security-reviewer`, `plan-verifier`, then after a cue-free user continuation `security-executor` and `verifier`; tests pass |
+
+The four default cases contain none of the seven role names or the words agent,
+subagent, spawn, delegate, delegation, Plan, approval, or verifier. Their
+combined `subagent_spawned` events must cover all seven roles. Forced capability
+and adversarial cases remain selectable with `--cases` for focused diagnosis.
 
 Every live case also inspects its persisted `chat_history.jsonl` and
 `updates.jsonl`. A `/.claude/` or `CLAUDE_PLUGIN_ROOT` context marker, or any
-`hook_execution` event, fails the run. The harness additionally forces all six
+Claude-derived `hook_execution` event fails the run; unrelated native Grok
+hooks are recorded but allowed. The harness additionally forces all six
 `GROK_CLAUDE_*_ENABLED=false` environment variables as defense in depth; the
 install-only preflight still checks that the persistent config is closed first.
 
@@ -49,10 +52,11 @@ python3 benchmarks/e2e-dispatch/run.py --skip-live
 python3 benchmarks/e2e-dispatch/run.py
 
 # subset
-python3 benchmarks/e2e-dispatch/run.py --cases ambient-native-plan,approval-bypass
+python3 benchmarks/e2e-dispatch/run.py --cases cue-free-mechanical,cue-free-judgment
 ```
 
-Writes [`results.json`](./results.json) on every run (success or failure).
+Live runs write [`results.json`](./results.json); `--skip-live` writes
+`results.install-only.json`.
 
 ## Cost & time
 
@@ -62,12 +66,12 @@ latency benchmark.
 
 The original v1.0.3 record ran before Claude compatibility isolation was added
 and is retained in the research report only as contaminated historical
-evidence. The accepted v1.0.5 `results.json` is case-complete run set
-`f3a7a889-31b1-4aa0-9052-021a312d8014`: all six cases passed in 765.124
-seconds of aggregate case time with `$1.205134` in client cost fields, after
-both persistent and per-process isolation gates passed. The component run IDs
-are recorded in the artifact; cases were split after policy-compliant
-two-`REVISE` pauses so completed expensive cases were not discarded.
+evidence. The accepted v1.0.6 candidate `results.json` is run
+`234ec0bf-6bdb-4711-8b7d-ca3cc98e6a2b`: all four cue-free cases passed in
+528.487 seconds of aggregate case time with `$1.1183612` in client cost fields,
+and their persisted spawn events covered all seven roles. The artifact records
+the source policy override as v1.0.6 and the then-installed global policy as
+v1.0.5 rather than conflating candidate behavior with installation state.
 
 Headless `grok -p` disconnects when `exit_plan_mode` reaches the interactive
 approval surface. A passing headless case therefore requires the ordered exit
@@ -76,8 +80,6 @@ call plus `plan_mode.json` with `state=Active` and
 
 ## Non-goals
 
-- General orchestrator role-choice quality outside the mandatory native Plan
-  lifecycle
 - Interactive `/plan` slash-command transport; its mandatory verifier rule is
   locked by policy/static tests, while live cases exercise native entry through
   `enter_plan_mode`
@@ -97,7 +99,7 @@ call plus `plan_mode.json` with `state=Active` and
 | no Plan file | Grok entered Plan Mode but did not write session `plan.md` |
 | no readiness `READY` before exit | Mandatory `plan-verifier` dispatch or event ordering failed |
 | approval-bypass writes files | Automatic permission grant was treated as user Plan approval, or the native gate was bypassed |
-| no `subagent_spawned` | Model ignored spawn instruction, or subagents disabled |
+| missing cue-free role | Policy routing gate was ignored, stale, or the task was misclassified |
 | wrong `capability_mode` | Role TOML not loaded; check `~/.grok/roles/<role>.toml` |
 | missing READY/REVISE | plan-verifier prompt drift or role body broken |
 

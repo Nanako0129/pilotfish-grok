@@ -96,11 +96,13 @@ without editing policy prose.
 
 ## Phase-aware orchestration
 
-Role matching makes work eligible for delegation; it does not make delegation
-mandatory. The main session retains framing, Plan synthesis, architecture,
+Role matching is cue-free: qualifying reconnaissance, multi-surface mechanical
+work, bounded judgment work, security work, Plan review, and completed-work
+verification must dispatch their named roles even when the user does not name
+agents. The main session retains framing, Plan synthesis, architecture,
 ambiguity resolution, integration, and final judgment.
 
-Plan readiness is the deliberate exception to optional role dispatch. For
+Plan readiness is the strict pre-approval instance of mandatory dispatch. For
 large, ambiguous, architectural, risky, or explicitly plan-first work, the
 orchestrator calls `enter_plan_mode` before repository discovery, writes the
 session `plan.md`, and sends the full Plan to a fresh read-only
@@ -127,7 +129,6 @@ verification share one evidence chain.
 | Eighth `Explore` agent | No Claude-style shadow need; `scout` is enough |
 | Forced main-session model | User-controlled; Grok has no `best` alias story |
 | Claude-style baton gate | [e2e-dispatch](../benchmarks/e2e-dispatch/README.md) covers adversarial approval bypass plus forced spawn plumbing, not a complete multi-turn Baton workflow |
-| General unprompted role-routing eval | `ambient-native-plan` covers the mandatory Plan lifecycle; free-form role choice outside that gate remains out of scope |
 | Enforcement hooks | Policy-first, matching Pilotfish philosophy |
 | Per-project install | Global `~/.grok/` is the product surface |
 | Editing `~/.claude/` | Isolation is Grok-owned config only; Claude pilotfish remains independent |

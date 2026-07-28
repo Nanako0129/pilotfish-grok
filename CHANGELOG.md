@@ -2,6 +2,14 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.6] — 2026-07-28
+
+Require cue-free task classification to dispatch all seven named roles without
+user hints. Natural discovery, multi-surface mechanical work, judgment work,
+security review and execution, Plan readiness, and completed-work verification
+now have live spontaneous-routing coverage. Unrelated native Grok hooks remain
+allowed while Claude-derived session context still fails closed.
+
 ## [1.0.5] — 2026-07-28
 
 Require approved security-sensitive execution slices to execute only through a

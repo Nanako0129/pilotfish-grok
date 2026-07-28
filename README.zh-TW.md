@@ -275,7 +275,7 @@ python3 benchmarks/e2e-dispatch/run.py
 
 ## 限制（v1.0）
 
-- Live e2e 證明 ambient native Plan entry、強制 Plan readiness review、adversarial approval-bypass gate 與**強制**角色 capability；不代表 mandatory Plan lifecycle 之外的 ambient 角色選擇一定正確
+- Live e2e 使用不含 agent、角色、spawn、delegation、Plan、approval 提示的自然任務，並要求整組 session 自發 dispatch 全部七個角色且套用正確 capability mode
 - 父 session plan mode **不**擋子代理寫入——唯讀靠 role capability
 - 單一模型目錄沒有多模型價差套利；effort 與 context 節省仍成立
 - 不卸載、不改寫 Claude pilotfish

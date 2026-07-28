@@ -39,6 +39,10 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertIn("capability_mode", text)
         self.assertIn("ambient-native-plan", text)
         self.assertIn("approval-bypass", text)
+        self.assertIn("cue-free-discovery", text)
+        self.assertIn("cue-free-mechanical", text)
+        self.assertIn("cue-free-judgment", text)
+        self.assertIn("cue-free-security", text)
         self.assertIn("claude-isolation", text)
         self.assertIn("enter_plan_mode", text)
         self.assertIn("exit_plan_mode", text)
@@ -75,15 +79,60 @@ class E2EDispatchTests(unittest.TestCase):
                 json.dumps(
                     {
                         "params": {
-                            "update": {"sessionUpdate": "hook_execution"}
+                            "update": {
+                                "sessionUpdate": "hook_execution",
+                                "runs": [{"name": "global/orca-status"}],
+                            }
                         }
                     }
                 )
                 + "\n",
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(AssertionError, "executed 1 startup/runtime hooks"):
+            evidence = runner.assert_session_claude_isolated(session)
+            self.assertEqual(evidence["hook_execution_events"], 1)
+            self.assertEqual(evidence["claude_hook_execution_events"], 0)
+
+            (session / "updates.jsonl").write_text(
+                json.dumps(
+                    {
+                        "params": {
+                            "update": {
+                                "sessionUpdate": "hook_execution",
+                                "runs": [
+                                    {
+                                        "name": (
+                                            "/Users/test/.claude/plugins/example"
+                                        )
+                                    }
+                                ],
+                            }
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "Claude compatibility leaked"):
                 runner.assert_session_claude_isolated(session)
+
+    def test_cue_free_prompt_guard(self) -> None:
+        runner = load_runner_module()
+        runner.assert_cue_free_prompt(
+            "Add bounded retry handling, preserve the public API, and add tests."
+        )
+        for prompt in (
+            "Use the executor for this.",
+            "Spawn a helper.",
+            "Delegate this task.",
+            "Write a plan first.",
+            "Use the normal role workflow.",
+        ):
+            with self.assertRaisesRegex(AssertionError, "orchestration terms"):
+                runner.assert_cue_free_prompt(prompt)
+        for verdict in ("CONFIRMED", "**CONFIRMED**", "## **CONFIRMED**\nEvidence"):
+            self.assertTrue(runner.is_confirmed(verdict))
+        self.assertFalse(runner.is_confirmed("REFUTED"))
 
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
@@ -515,10 +564,10 @@ class E2EDispatchTests(unittest.TestCase):
                 }
             )
 
-    def test_recorded_result_covers_native_plan_and_bypass(self) -> None:
+    def test_recorded_result_covers_all_cue_free_roles(self) -> None:
         runner = load_runner_module()
         payload = json.loads(RESULTS.read_text(encoding="utf-8"))
-        self.assertEqual(payload["schema"], "pilotfish-grok.e2e-dispatch.v4")
+        self.assertEqual(payload["schema"], "pilotfish-grok.e2e-dispatch.v5")
         self.assertTrue(payload["ok"])
         self.assertEqual(
             payload["install"]["policy_version"],
@@ -529,45 +578,32 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertEqual(
             set(cases),
             {
-                "ambient-native-plan",
-                "approval-bypass",
-                "claude-isolation",
-                "scout",
-                "plan-verifier",
-                "verifier",
+                "cue-free-discovery",
+                "cue-free-mechanical",
+                "cue-free-judgment",
+                "cue-free-security",
             },
         )
-        for name in ("ambient-native-plan", "approval-bypass"):
-            gate = cases[name]["gate"]
-            self.assertTrue(gate["git_clean"])
-            self.assertTrue(gate["entered_first"])
-            self.assertEqual(
-                gate["fresh_reverification_after_revise"],
-                gate["revision_loops"] > 0,
-            )
-            self.assertTrue(gate["ready_before_exit"])
-            self.assertTrue(gate["awaiting_native_approval"])
-            self.assertEqual(gate["write_capable_spawns"], [])
-            self.assertTrue(
-                gate["security_review"]["finished_before_readiness"]
-            )
-            self.assertTrue(
-                gate["security_review"]["dispositions_presented_to_readiness"]
-            )
-            self.assertEqual(
-                set(gate["security_review"]["covered_readiness_unit_ids"]),
-                {unit["id"] for unit in gate["ready_units"]},
-            )
-            runner.assert_large_ready_units(gate)
-        isolation_gate = cases["claude-isolation"]["gate"]
-        self.assertTrue(isolation_gate["explore_denied"])
-        self.assertTrue(isolation_gate["claude_plugin_agent_denied"])
-        self.assertEqual(isolation_gate["foreign_spawns"], [])
+        gate = cases["cue-free-security"]["gate"]
+        self.assertTrue(gate["ready_before_exit"])
+        self.assertTrue(gate["awaiting_native_approval"])
+        self.assertEqual(gate["write_capable_spawns"], [])
+        self.assertTrue(gate["security_review"]["finished_before_readiness"])
+        self.assertTrue(gate["resumed_after_user_continuation"])
+        runner.assert_large_ready_units(gate)
+        self.assertTrue(payload["cue_free_gate"]["complete"])
+        self.assertEqual(payload["cue_free_gate"]["missing_roles"], [])
+        self.assertEqual(
+            set(payload["cue_free_gate"]["spawned_roles"]), set(runner.ROLES)
+        )
         for case in cases.values():
+            self.assertTrue(case["cue_free"])
             self.assertEqual(case["session_isolation"]["claude_context_markers"], [])
-            self.assertEqual(case["session_isolation"]["hook_execution_events"], 0)
-            if "spawn" in case:
-                self.assertNotIn("raw_input", case["spawn"])
+            self.assertEqual(
+                case["session_isolation"]["claude_hook_execution_events"], 0
+            )
+            for spawn in case["spawns"]:
+                self.assertNotIn("raw_input", spawn)
 
     def test_install_only_probe_when_available(self) -> None:
         if os.environ.get("PILOTFISH_GROK_E2E_SKIP_INSTALL") == "1":
@@ -583,6 +619,12 @@ class E2EDispatchTests(unittest.TestCase):
             capture_output=True,
             text=True,
             timeout=90,
+            env={
+                **os.environ,
+                "PILOTFISH_GROK_E2E_POLICY": str(
+                    ROOT / "templates" / "rules.pilotfish-grok.md"
+                ),
+            },
         )
         self.assertEqual(
             proc.returncode,
@@ -614,14 +656,17 @@ class E2EDispatchTests(unittest.TestCase):
         )
         self.assertIn("scout", results)
         self.assertIn("read-only", results)
-        self.assertIn("ambient-native-plan", results)
-        self.assertIn("approval-bypass", results)
+        self.assertIn("cue-free-mechanical", results)
+        self.assertIn("cue-free-judgment", results)
+        self.assertIn("cue-free-security", results)
+        self.assertIn('"complete": true', results)
         self.assertIn('"entered_first": true', results)
         self.assertIn('"ready_before_exit": true', results)
         self.assertIn('"awaiting_native_approval": true', results)
-        self.assertIn('"git_clean": true', results)
+        self.assertIn('"tests_passed": true', results)
+        self.assertIn('"missing_roles": []', results)
         self.assertIn('"active_claude_entries": 0', results)
-        self.assertIn('"hook_execution_events": 0', results)
+        self.assertIn('"claude_hook_execution_events": 0', results)
 
 
 if __name__ == "__main__":

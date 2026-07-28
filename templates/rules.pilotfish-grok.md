@@ -1,5 +1,5 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.5 -->
+<!-- pilotfish-grok v1.0.6 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
@@ -11,6 +11,8 @@ mandatory. If Plan Mode is not already active, the first tool call MUST be
 already activated Plan Mode with `/plan`, continue there; the verifier gate
 still applies. If `enter_plan_mode` is denied or unavailable, stop without
 source writes or implementation tools and ask the user to enter Plan Mode.
+Treat every security-sensitive implementation as risky for this gate,
+regardless of size.
 
 Inside Plan Mode, discovery is read-only and the only permitted write is the
 session `plan.md`. The main session must synthesize the complete Plan, then
@@ -61,8 +63,8 @@ tool call for that slice, the main session MUST successfully spawn
 `security-executor` with the approved stable contract. The main session and
 every role other than `security-executor` MUST NOT implement that slice
 directly. The direct-work allowance, dispatch brake, coordination-cost
-heuristic, matching-role-optional rule, single-unknown-bug exception, and
-failed-attempt takeover rule do not waive this boundary. If the spawn is
+heuristic, cue-free routing gate, single-unknown-bug exception, and
+failed-attempt retry rule do not waive this boundary. If the spawn is
 unavailable or fails, stop without source mutation or implementation tools. If
 implementation attempts fail, stop or retask through `security-executor`;
 neither the main session nor another role may take over the slice.
@@ -75,7 +77,8 @@ yourself without further delegation.
 Use the named role agents for bounded discovery, execution, and fresh-context
 verification while keeping task framing, Plan synthesis, architecture,
 ambiguity resolution, integration, and final judgment in the main session.
-Complete small, local, already-stable work directly.
+Choose from the work itself even when the user never mentions agents,
+delegation, or this workflow.
 
 | Role | Boundary |
 |---|---|
@@ -91,16 +94,41 @@ There is no installed `Explore` role. Use `scout` for discovery. Grok's built-in
 `explore` type may still be used for broad searches when useful; do not treat it
 as a pilotfish-grok named role with custom routing.
 
+### Cue-free dispatch gate
+
+Before using repository discovery or implementation tools, classify the bounded
+work and apply the first matching rule without waiting for the user to name a
+role:
+
+- After entering Plan Mode when required, spawn `scout` before any repository
+  search that must locate an unknown file or symbol, or any broad or cross-file
+  reconnaissance.
+- Spawn `mech-executor` before a fully specified mechanical implementation
+  that must keep multiple files or surfaces consistent.
+- Spawn `executor` before a bounded non-security implementation that requires
+  local engineering judgment.
+- Use the mandatory `security-reviewer`, `plan-verifier`, and
+  `security-executor` boundaries for security-sensitive or gated work.
+- After integrating any non-trivial implementation, spawn a fresh `verifier`
+  and collect its `CONFIRMED` or `REFUTED` result before claiming completion.
+
+These are routing gates, not prompt keywords. The dispatch brake may reduce
+fan-out or serialize work, but it cannot turn matching work into main-session
+execution. If a required spawn fails, stop or retry that role; do not silently
+perform its bounded work in the main session. Direct work is limited to trivial
+single-surface edits and the tightly coupled first fix for one unknown,
+non-security bug described below.
+
 For large, ambiguous, architectural, risky, or explicitly plan-first work, use
 this lifecycle:
 
 | Phase | Gate | Eligible delegation |
 |---|---|---|
-| Discovery | Enter native Plan Mode first for gated work, then stabilize the question, allowed scope, evidence format, and stop condition with read-only discovery. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
+| Discovery | Enter native Plan Mode first for gated work, then stabilize the question, allowed scope, evidence format, and stop condition with read-only discovery. The final implementation may remain unknown. | Mandatory bounded read-only `scout` for broad or cross-file reconnaissance. |
 | Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, a program envelope, and independent slices. | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
 | Approval | `READY` for the envelope and current slice unlocks `exit_plan_mode` to present that scope and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
-| Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
-| Verification | The integrated result is concrete enough to refute as a completed-work claim. | A fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
+| Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | Mandatory matching `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
+| Verification | The integrated non-trivial result is concrete enough to refute as a completed-work claim. | A mandatory fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
 
 ### Dispatch
 
@@ -110,11 +138,11 @@ evidence, write ownership overlaps, no clear synthesis or integration owner
 exists, or coordination cost exceeds the likely benefit. Discovery agents report
 facts; the main session reconciles contradictions and writes the Plan.
 
-Use the smallest useful execution shape: work directly for small or tightly
-coupled tasks, one worker for a bounded side task, and bounded parallel workers
-only for independent, low-overlap workstreams. Delegate only when the saved
-execution or context cost exceeds the briefing, coordination, and review cost.
-A matching role makes work eligible rather than mandatory.
+Use the smallest useful execution shape: direct work only for the explicit
+trivial and single-unknown-bug exceptions above, one worker for a bounded task,
+and bounded parallel workers only for independent, low-overlap workstreams.
+A matching cue-free gate is mandatory; other delegation remains optional when
+its saved execution or context cost exceeds briefing, coordination, and review.
 
 The mandatory `plan-verifier` readiness gate is not an optional delegation
 choice and is not waived by the dispatch brake or coordination-cost heuristic.
@@ -150,10 +178,10 @@ override only for a truly ad-hoc agent with no matching role definition.
 
 Brief each worker in one shot with the goal, constraints, done criteria,
 relevant paths, rationale, output format, budget, and verification expectation.
-Start with the cheapest eligible role. After two failed attempts, change the
-task boundary or escalate one tier. The main session may take over only
-non-security-sensitive work; a security-sensitive slice must stop or be
-retasked through `security-executor`. Treat scout findings as inputs;
+Start with the cheapest matching role. After two failed attempts, change the
+task boundary or escalate one tier without bypassing a cue-free gate. A
+security-sensitive slice must stop or be retasked through
+`security-executor`. Treat scout findings as inputs;
 sanity-check any single fact that carries a decision.
 
 ### Parallelism and long work

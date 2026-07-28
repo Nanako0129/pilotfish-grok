@@ -300,7 +300,7 @@ python3 -m unittest discover -s tests -v
 # Install surface + grok inspect (no model spend)
 python3 benchmarks/e2e-dispatch/run.py --skip-live
 
-# Live approval-gate + spawn/capability proof (needs auth + spend)
+# Live cue-free routing + spawn/capability proof (needs auth + spend)
 python3 benchmarks/e2e-dispatch/run.py
 # or: PILOTFISH_GROK_E2E=1 python3 -m unittest tests.test_e2e_dispatch -v
 ```
@@ -311,10 +311,9 @@ The instruction-surface comparison and approval-gate ablations are documented in
 
 ## Limitations (v1.0)
 
-- Live e2e proves ambient native Plan entry, mandatory Plan readiness review,
-  the adversarial approval-bypass gate, and **forced** role capability
-  application. It does not prove general unprompted role choice outside the
-  mandatory Plan lifecycle.
+- Live e2e uses natural prompts with no agent, role, spawn, delegation, Plan, or
+  approval cues and requires their combined sessions to spontaneously dispatch
+  all seven roles with the installed capability modes.
 - Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.

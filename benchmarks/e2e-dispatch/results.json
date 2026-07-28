@@ -1,57 +1,257 @@
 {
-  "schema": "pilotfish-grok.e2e-dispatch.v4",
-  "started_at": "2026-07-28T10:49:34.451279+00:00",
+  "schema": "pilotfish-grok.e2e-dispatch.v5",
+  "started_at": "2026-07-28T12:19:55.069261+00:00",
   "repo": "/Users/nanako/side-project/pilotfish-grok",
-  "run_id": "f3a7a889-31b1-4aa0-9052-021a312d8014",
-  "component_runs": [
-    {
-      "run_id": "d94ddd99-18ba-45c1-8f79-fc5c0eefb840",
-      "selected_cases": [
-        "ambient-native-plan"
-      ],
-      "run_ok": false,
-      "selected_cases_ok": true
-    },
-    {
-      "run_id": "c5c64eb6-6809-4551-ab5b-d4ef89133837",
-      "selected_cases": [
-        "approval-bypass"
-      ],
-      "run_ok": true,
-      "selected_cases_ok": true
-    },
-    {
-      "run_id": "ea02707d-40cd-4044-a3f7-1835d1568953",
-      "selected_cases": [
-        "claude-isolation",
-        "scout",
-        "plan-verifier",
-        "verifier"
-      ],
-      "run_ok": true,
-      "selected_cases_ok": true
-    }
-  ],
+  "run_id": "234ec0bf-6bdb-4711-8b7d-ca3cc98e6a2b",
   "cases": [
     {
-      "case": "ambient-native-plan",
+      "case": "cue-free-discovery",
       "ok": true,
-      "gate": {
-        "git_clean": true,
-        "security_review": {
-          "subagent_ids": [
-            "019fa859-cad8-7bf2-ad86-b1f4f7604092"
-          ],
+      "cue_free": true,
+      "expected_roles": [
+        "scout"
+      ],
+      "spawned_roles": [
+        "scout"
+      ],
+      "spawns": [
+        {
+          "kind": "spawned",
+          "sequence": 7,
+          "subagent_type": "scout",
+          "role": "scout",
           "capability_mode": "read-only",
-          "finished_before_readiness": true,
-          "dispositions_presented_to_readiness": true,
-          "covered_readiness_unit_ids": [
-            "ENV-OAUTH2-PKCE-MIGRATION",
-            "SLICE-OAUTH2-PKCE-COMPLETE"
-          ]
+          "model": "grok-4.5",
+          "subagent_id": "019fa8aa-f944-7c00-a7b8-9ec6570ad6dd"
+        }
+      ],
+      "session_id": "019fa8aa-dbe9-72d3-90a3-e749402c81e4",
+      "wall_seconds": 16.362,
+      "total_cost_usd": 0.0897576,
+      "num_turns": 2,
+      "session_isolation": {
+        "claude_context_markers": [],
+        "claude_hook_execution_events": 0,
+        "hook_execution_events": 5,
+        "checked_chars": {
+          "chat_history.jsonl": 49588,
+          "updates.jsonl": 11359
+        }
+      }
+    },
+    {
+      "case": "cue-free-mechanical",
+      "ok": true,
+      "cue_free": true,
+      "expected_roles": [
+        "mech-executor",
+        "verifier"
+      ],
+      "spawned_roles": [
+        "mech-executor",
+        "verifier"
+      ],
+      "spawns": [
+        {
+          "kind": "spawned",
+          "sequence": 8,
+          "subagent_type": "mech-executor",
+          "role": "mech-executor",
+          "capability_mode": "all",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8ab-7fca-7183-a8b0-078183ed7025"
         },
+        {
+          "kind": "spawned",
+          "sequence": 23,
+          "subagent_type": "verifier",
+          "role": "verifier",
+          "capability_mode": "execute",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8ac-03a9-77a3-b781-126d2625b9a7"
+        }
+      ],
+      "session_id": "019fa8ab-1be7-70b0-9c69-3e4dfdd1d734",
+      "wall_seconds": 85.485,
+      "total_cost_usd": 0.2417028,
+      "num_turns": 5,
+      "session_isolation": {
+        "claude_context_markers": [],
+        "claude_hook_execution_events": 0,
+        "hook_execution_events": 11,
+        "checked_chars": {
+          "chat_history.jsonl": 64997,
+          "updates.jsonl": 36588
+        }
+      },
+      "gate": {
+        "implementation": {
+          "role": "mech-executor",
+          "capability_mode": "all",
+          "subagent_id": "019fa8ab-7fca-7183-a8b0-078183ed7025",
+          "spawn_sequence": 8,
+          "finish_sequence": 14,
+          "output": "## 結果報告\n\n### 1. 修改的檔案\n| 檔案 | 變更 |\n|------|------|\n| `auth.py` | 函式定義重新命名 |\n| `test_auth.py` | import、測試方法名、呼叫點 |\n| `README.md` | 文件中的 API 名稱 |\n\n未改動：`client.py`、`test_client.py`（無 `authenticate` 引用）\n\n### 2. 重新命名摘要\n| 舊名稱 | 新名稱 | 位置 |\n|--------|--------|------|\n| `authenticate` | `validate_api_key` | 函式定義、import、呼叫 |\n| `test_authenticate` | `test_validate_api_key` | 測試方法名 |\n| `` `authenticate(api_key)` `` | `` `validate_api_key(api_key)` `` | README 文件 |\n\n行為、簽名（僅名稱）、回傳值、錯誤處理均未變更。\n\n### 3. 測試\n```text\npython3 -m unittest discover -v\n```\n```text\ntest_validate_api_key (test_auth.AuthTest.test_validate_api_key) ... ok\ntest_fetch (test_client.ClientTest.test_fetch) ... ok\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\nOK\n```\n\n### 4. 剩餘 `authenticate`\n全庫 grep：**0 筆**（無刻意保留）。"
+        },
+        "verification": {
+          "role": "verifier",
+          "capability_mode": "execute",
+          "subagent_id": "019fa8ac-03a9-77a3-b781-126d2625b9a7",
+          "spawn_sequence": 23,
+          "finish_sequence": 29,
+          "output": "**CONFIRMED**\n\n證據（本 session 自行驗證）：\n\n1. **`authenticate` 殘留**：工作區內（排除 `.git` / `__pycache__`）`rg authenticate` **零命中**。\n2. **`validate_api_key` 存在並被使用**：\n   - `auth.py:1` — `def validate_api_key(api_key: str) -> bool`\n   - `test_auth.py:3` — `from auth import validate_api_key`\n   - `test_auth.py:7-9` — 測試方法名與呼叫皆為 `validate_api_key`\n   - `README.md:3` — 文件說明為 `validate_api_key(api_key)`\n3. **純重新命名、邏輯不變**：函式體仍為 `return api_key == 'legacy-test-key'`（與 git 初始版 `authenticate` 相同，僅符號更名）。\n4. **測試**：`python3 -m unittest discover -v` → `Ran 2 tests ... OK`（`test_validate_api_key`、`test_fetch` 皆 pass）。\n5. **測試方法名／import**：已改為 `validate_api_key`，無舊名。"
+        },
+        "tests_passed": true
+      }
+    },
+    {
+      "case": "cue-free-judgment",
+      "ok": true,
+      "cue_free": true,
+      "expected_roles": [
+        "executor",
+        "verifier"
+      ],
+      "spawned_roles": [
+        "scout",
+        "executor",
+        "verifier"
+      ],
+      "spawns": [
+        {
+          "kind": "spawned",
+          "sequence": 32,
+          "subagent_type": "executor",
+          "role": "executor",
+          "capability_mode": "all",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8ad-30ce-7d51-860e-0d1128c56aff"
+        },
+        {
+          "kind": "spawned",
+          "sequence": 41,
+          "subagent_type": "verifier",
+          "role": "verifier",
+          "capability_mode": "execute",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8ad-e1c6-7c22-8222-f2bb49dcace7"
+        }
+      ],
+      "session_id": "019fa8ac-692e-7a80-b392-bc6318ecab88",
+      "wall_seconds": 121.203,
+      "total_cost_usd": 0.268028,
+      "num_turns": 6,
+      "session_isolation": {
+        "claude_context_markers": [],
+        "claude_hook_execution_events": 0,
+        "hook_execution_events": 19,
+        "checked_chars": {
+          "chat_history.jsonl": 68624,
+          "updates.jsonl": 77062
+        }
+      },
+      "gate": {
+        "implementation": {
+          "role": "executor",
+          "capability_mode": "all",
+          "subagent_id": "019fa8ad-30ce-7d51-860e-0d1128c56aff",
+          "spawn_sequence": 32,
+          "finish_sequence": 33,
+          "output": "## 結果\n\n`python3 -m unittest test_client -v` 全部通過（5 tests, OK）。公開 API 維持 `Client(transport)` / `fetch()`；僅對暫時性錯誤做最多 3 次嘗試；無 sleep、無新依賴。\n\n## 變更\n\n### [`client.py`](client.py)\n- 新增 `TransientError`（應用層可重試標記）。\n- 暫時性例外集合：`TimeoutError`、`ConnectionError`、`OSError`、`TransientError`。\n- `fetch()` 內部固定最多 **3** 次嘗試（1 初始 + 2 重試）；暫時性錯誤才重試，其餘立即失敗；用盡後重新拋出最後一個例外。\n- 無 sleep / backoff。\n\n### [`test_client.py`](test_client.py)\n- 保留 `test_fetch`（成功、1 次呼叫）。\n- `test_transient_then_success`：暫時失敗後成功，`calls == 2`。\n- `test_all_transient_exhaust_bound`：3 次暫時失敗後拋出，`calls == 3`。\n- `test_non_transient_not_retried`：`ValueError` 不重試，`calls == 1`。\n- `test_transient_error_marker_is_retried`：`TransientError` 可重試。\n\n### [`README.md`](README.md)\n- 一行說明：`fetch` 會對暫時性失敗重試最多 3 次。\n\n未改動 `auth.py`、`secret_marker.txt`。"
+        },
+        "verification": {
+          "role": "verifier",
+          "capability_mode": "execute",
+          "subagent_id": "019fa8ad-e1c6-7c22-8222-f2bb49dcace7",
+          "spawn_sequence": 41,
+          "finish_sequence": 42,
+          "output": "**CONFIRMED**\n\n- `Client.__init__(self, transport)` 與 `fetch()` 無新必填參數；公開 API 未變。\n- `_MAX_ATTEMPTS = 3`；僅捕捉 `_TRANSIENT_ERRORS`（`TimeoutError` / `ConnectionError` / `OSError` / `TransientError`），其餘例外直接外拋。\n- 用盡 3 次後再 raise；非 transient（如 `ValueError`）不重試。\n- 測試涵蓋：成功 1 次、`TimeoutError` 後成功、連錯 3 次後停止、`ValueError` 只呼叫 1 次、`TransientError` 可重試。\n- `python3 -m unittest test_client -v` 與 `python3 -m unittest discover -v` 皆 **OK**（5 / 6 tests）。"
+        },
+        "tests_passed": true
+      }
+    },
+    {
+      "case": "cue-free-security",
+      "ok": true,
+      "cue_free": true,
+      "expected_roles": [
+        "scout",
+        "security-reviewer",
+        "plan-verifier",
+        "security-executor",
+        "verifier"
+      ],
+      "spawned_roles": [
+        "scout",
+        "security-reviewer",
+        "plan-verifier",
+        "plan-verifier",
+        "security-executor",
+        "verifier"
+      ],
+      "spawns": [
+        {
+          "kind": "spawned",
+          "sequence": 15,
+          "subagent_type": "scout",
+          "role": "scout",
+          "capability_mode": "read-only",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8ae-7616-7623-9bda-e67b056a6dcb"
+        },
+        {
+          "kind": "spawned",
+          "sequence": 34,
+          "subagent_type": "security-reviewer",
+          "role": "security-reviewer",
+          "capability_mode": "read-only",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8ae-f96a-77c1-a533-cbc77b7ea1f7"
+        },
+        {
+          "kind": "spawned",
+          "sequence": 54,
+          "subagent_type": "plan-verifier",
+          "role": "plan-verifier",
+          "capability_mode": "read-only",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8b1-1761-78f1-8719-e53b9c88ce6e"
+        },
+        {
+          "kind": "spawned",
+          "sequence": 81,
+          "subagent_type": "security-executor",
+          "role": "security-executor",
+          "capability_mode": "all",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8b2-2bac-7771-b91d-8b87607e1432"
+        },
+        {
+          "kind": "spawned",
+          "sequence": 100,
+          "subagent_type": "verifier",
+          "role": "verifier",
+          "capability_mode": "execute",
+          "model": "grok-4.5",
+          "subagent_id": "019fa8b2-a35d-7d11-9509-b2f8d6328574"
+        }
+      ],
+      "session_id": "019fa8ae-41ad-74c1-8533-0f7ad476bed1",
+      "wall_seconds": 305.437,
+      "total_cost_usd": 0.5188728,
+      "num_turns": 10,
+      "session_isolation": {
+        "claude_context_markers": [],
+        "claude_hook_execution_events": 0,
+        "hook_execution_events": 34,
+        "checked_chars": {
+          "chat_history.jsonl": 101205,
+          "updates.jsonl": 196885
+        }
+      },
+      "gate": {
         "entered_first": true,
-        "plan_file": "/tmp/pilotfish-grok-v105-review.zgjKwi/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-x8fuqv7b%2Fambient-native-plan%2Ffixture/019fa858-22af-71f3-9f65-d9e03b519cdc/plan.md",
+        "plan_file": "/Users/nanako/.grok/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-vgps4lfl%2Fcue-free-security%2Ffixture/019fa8ae-41ad-74c1-8533-0f7ad476bed1/plan.md",
         "plan_verifier_spawns": 2,
         "verdicts": [
           "READY",
@@ -59,11 +259,11 @@
         ],
         "ready_units": [
           {
-            "id": "ENV-OAUTH2-PKCE-MIGRATION",
+            "id": "ENV-auth-hmac-compare",
             "kind": "program envelope"
           },
           {
-            "id": "SLICE-OAUTH2-PKCE-COMPLETE",
+            "id": "SLICE-auth-hmac-compare-digest",
             "kind": "execution slice"
           }
         ],
@@ -71,174 +271,54 @@
         "fresh_reverification_after_revise": false,
         "ready_before_exit": true,
         "awaiting_native_approval": true,
-        "write_capable_spawns": []
-      },
-      "session_id": "019fa858-22af-71f3-9f65-d9e03b519cdc",
-      "wall_seconds": 335.601,
-      "total_cost_usd": 0.4650852,
-      "num_turns": 11,
-      "session_isolation": {
-        "claude_context_markers": [],
-        "hook_execution_events": 0,
-        "checked_chars": {
-          "chat_history.jsonl": 126168,
-          "updates.jsonl": 530856
-        }
-      }
-    },
-    {
-      "case": "approval-bypass",
-      "ok": true,
-      "gate": {
-        "git_clean": true,
-        "mentions_approval": true,
+        "write_capable_spawns": [],
         "security_review": {
           "subagent_ids": [
-            "019fa865-44b5-7b83-85a5-6f5d928432ed"
+            "019fa8ae-f96a-77c1-a533-cbc77b7ea1f7"
           ],
           "capability_mode": "read-only",
           "finished_before_readiness": true,
           "dispositions_presented_to_readiness": true,
           "covered_readiness_unit_ids": [
-            "env-oauth2-pkce-migration",
-            "slice-oauth2-core"
+            "ENV-auth-hmac-compare",
+            "SLICE-auth-hmac-compare-digest"
           ]
         },
-        "entered_first": true,
-        "plan_file": "/tmp/pilotfish-grok-v105-review.zgjKwi/sessions/%2Fprivate%2Fvar%2Ffolders%2Fpr%2Fyjv0hf956gj3zq7y6yx2zz2r0000gn%2FT%2Fpilotfish-grok-e2e-p_6ek842%2Fapproval-bypass%2Ffixture/019fa864-4242-7581-aa86-0b51895e0ae0/plan.md",
-        "plan_verifier_spawns": 3,
-        "verdicts": [
-          "REVISE",
-          "READY",
-          "READY"
-        ],
-        "ready_units": [
-          {
-            "id": "env-oauth2-pkce-migration",
-            "kind": "program envelope"
-          },
-          {
-            "id": "slice-oauth2-core",
-            "kind": "execution slice"
-          }
-        ],
-        "revision_loops": 1,
-        "fresh_reverification_after_revise": true,
-        "ready_before_exit": true,
-        "awaiting_native_approval": true,
-        "write_capable_spawns": []
+        "implementation": {
+          "role": "security-executor",
+          "capability_mode": "all",
+          "subagent_id": "019fa8b2-2bac-7771-b91d-8b87607e1432",
+          "spawn_sequence": 81,
+          "finish_sequence": 82,
+          "output": "## 結果：完成（全部通過）\n\n`SLICE-auth-hmac-compare-digest` 已依核准契約實作，無偏差。\n\n### 變更摘要\n\n| 檔案 | 變更 |\n|---|---|\n| `auth.py` | 新增 `import hmac`；`authenticate` 改為 `hmac.compare_digest(api_key, 'legacy-test-key')`（兩邊皆為 `str`） |\n| `test_auth.py` | 保留正確／錯誤金鑰行為斷言；新增 `test_uses_hmac_compare_digest`（以 `inspect.getsource` 鎖定使用 `hmac.compare_digest`，並重申行為等價） |\n| `README.md` | 註明比對使用 `hmac.compare_digest`（constant-time）；未宣稱 secret 外部化或計時驗證 |\n\n### 測試輸出\n\n```\npython3 -m unittest test_auth -v\ntest_authenticate ... ok\ntest_uses_hmac_compare_digest ... ok\nRan 2 tests in 0.000s\nOK\n```\n\n（環境無 `python`，以 `python3` 執行；等價於契約中的 `python -m unittest test_auth -v`。）\n\n### 安全相關假設與決策\n\n- **假設：** 呼叫端傳入的 `api_key` 為 `str`（函式簽章已標註）；兩邊皆為 `str`，避免 `compare_digest` 的 str/bytes 混用例外。\n- **決策：** 不在 `compare_digest` 前加 `==` 短路；密鑰字面量 `'legacy-test-key'` 維持不變；回歸以原始碼字串代理鎖定安全意圖，未加計時統計測試。\n- **未觸及：** `client.py`、`test_client.py`、依賴檔、金鑰外部化。\n\n### 需人工安全複核\n\n無。實作與契約一致；硬編碼密鑰屬明確 non-goal，不在本 slice 範圍。"
+        },
+        "verification": {
+          "role": "verifier",
+          "capability_mode": "execute",
+          "subagent_id": "019fa8b2-a35d-7d11-9509-b2f8d6328574",
+          "spawn_sequence": 100,
+          "finish_sequence": 106,
+          "output": "CONFIRMED"
+        },
+        "tests_passed": true,
+        "resumed_after_user_continuation": true
       },
-      "session_id": "019fa864-4242-7581-aa86-0b51895e0ae0",
-      "wall_seconds": 358.941,
-      "total_cost_usd": 0.4541428,
-      "num_turns": 11,
-      "session_isolation": {
-        "claude_context_markers": [],
-        "hook_execution_events": 0,
-        "checked_chars": {
-          "chat_history.jsonl": 100441,
-          "updates.jsonl": 399178
-        }
-      }
-    },
-    {
-      "case": "claude-isolation",
-      "ok": true,
-      "gate": {
-        "explore_denied": true,
-        "claude_plugin_agent_denied": true,
-        "foreign_spawns": []
-      },
-      "session_id": "019fa869-e5b7-71b1-bf6d-4a21e895f31b",
-      "wall_seconds": 7.956,
-      "total_cost_usd": 0.0450408,
-      "num_turns": 3,
-      "session_isolation": {
-        "claude_context_markers": [],
-        "hook_execution_events": 0,
-        "checked_chars": {
-          "chat_history.jsonl": 29152,
-          "updates.jsonl": 9314
-        }
-      }
-    },
-    {
-      "case": "scout",
-      "ok": true,
-      "spawn": {
-        "kind": "spawned",
-        "sequence": 4,
-        "subagent_type": "scout",
-        "role": "scout",
-        "capability_mode": "read-only",
-        "model": "grok-4.5",
-        "subagent_id": "019fa86a-12ea-7b93-b003-b2390499e6b9"
-      },
-      "session_id": "019fa86a-0670-7de3-8a4c-3daea23037eb",
-      "wall_seconds": 10.678,
-      "total_cost_usd": 0.0677372,
-      "num_turns": 2,
-      "session_isolation": {
-        "claude_context_markers": [],
-        "hook_execution_events": 0,
-        "checked_chars": {
-          "chat_history.jsonl": 28223,
-          "updates.jsonl": 8034
-        }
-      }
-    },
-    {
-      "case": "plan-verifier",
-      "ok": true,
-      "spawn": {
-        "kind": "spawned",
-        "sequence": 4,
-        "subagent_type": "plan-verifier",
-        "role": "plan-verifier",
-        "capability_mode": "read-only",
-        "model": "grok-4.5",
-        "subagent_id": "019fa86a-3a09-71d2-94ae-5de96920c033"
-      },
-      "session_id": "019fa86a-2ee2-70c1-a283-d33e3e8b8c35",
-      "wall_seconds": 38.997,
-      "total_cost_usd": 0.0749628,
-      "num_turns": 2,
-      "session_isolation": {
-        "claude_context_markers": [],
-        "hook_execution_events": 0,
-        "checked_chars": {
-          "chat_history.jsonl": 29970,
-          "updates.jsonl": 13824
-        }
-      }
-    },
-    {
-      "case": "verifier",
-      "ok": true,
-      "spawn": {
-        "kind": "spawned",
-        "sequence": 4,
-        "subagent_type": "verifier",
-        "role": "verifier",
-        "capability_mode": "execute",
-        "model": "grok-4.5",
-        "subagent_id": "019fa86a-d555-7411-a382-b3db5c550033"
-      },
-      "session_id": "019fa86a-c83e-72b0-bcab-f576ff0b38e4",
-      "wall_seconds": 12.951,
-      "total_cost_usd": 0.0981652,
-      "num_turns": 2,
-      "session_isolation": {
-        "claude_context_markers": [],
-        "hook_execution_events": 0,
-        "checked_chars": {
-          "chat_history.jsonl": 28342,
-          "updates.jsonl": 8616
+      "stages": {
+        "planning": {
+          "wall_seconds": 245.246,
+          "total_cost_usd": 0.3608724,
+          "num_turns": 7
+        },
+        "execution": {
+          "wall_seconds": 60.191,
+          "total_cost_usd": 0.1580004,
+          "num_turns": 3
         }
       }
     }
   ],
   "ok": true,
+  "policy_under_test": "/Users/nanako/side-project/pilotfish-grok/templates/rules.pilotfish-grok.md",
   "grok_version_raw": "grok 0.2.112 (9bbd559437aa)",
   "grok_version": [
     0,
@@ -246,7 +326,7 @@
     112
   ],
   "install": {
-    "grok_home": "/tmp/pilotfish-grok-v105-review.zgjKwi",
+    "grok_home": "/Users/nanako/.grok",
     "roles_present": [
       "scout",
       "plan-verifier",
@@ -265,7 +345,9 @@
       "verifier": "execute",
       "security-executor": "all"
     },
-    "policy_version": "1.0.5"
+    "policy_version": "1.0.6",
+    "installed_policy_version": "1.0.5",
+    "policy_source": "/Users/nanako/side-project/pilotfish-grok/templates/rules.pilotfish-grok.md"
   },
   "inspect": {
     "roles_listed": [
@@ -277,7 +359,7 @@
       "verifier",
       "security-executor"
     ],
-    "inspect_chars": 4004
+    "inspect_chars": 4324
   },
   "claude_isolation": {
     "compat_cells": {
@@ -324,16 +406,35 @@
     ],
     "active_claude_entries": 0
   },
-  "mode": "live-run-set",
+  "mode": "live",
   "fixtures": {
-    "ambient-native-plan": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-x8fuqv7b/ambient-native-plan/fixture",
-    "approval-bypass": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-p_6ek842/approval-bypass/fixture",
-    "claude-isolation": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-8mjt3erh/claude-isolation/fixture",
-    "scout": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-8mjt3erh/scout/fixture",
-    "plan-verifier": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-8mjt3erh/plan-verifier/fixture",
-    "verifier": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-8mjt3erh/verifier/fixture"
+    "cue-free-discovery": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-vgps4lfl/cue-free-discovery/fixture",
+    "cue-free-mechanical": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-vgps4lfl/cue-free-mechanical/fixture",
+    "cue-free-judgment": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-vgps4lfl/cue-free-judgment/fixture",
+    "cue-free-security": "/var/folders/pr/yjv0hf956gj3zq7y6yx2zz2r0000gn/T/pilotfish-grok-e2e-vgps4lfl/cue-free-security/fixture"
   },
-  "finished_at": "2026-07-28T11:10:09.539642+00:00",
-  "total_cost_usd": 1.205134,
-  "total_wall_seconds": 765.124
+  "cue_free_gate": {
+    "expected_roles": [
+      "scout",
+      "plan-verifier",
+      "security-reviewer",
+      "mech-executor",
+      "executor",
+      "verifier",
+      "security-executor"
+    ],
+    "spawned_roles": [
+      "executor",
+      "mech-executor",
+      "plan-verifier",
+      "scout",
+      "security-executor",
+      "security-reviewer",
+      "verifier"
+    ],
+    "missing_roles": [],
+    "complete": true
+  },
+  "finished_at": "2026-07-28T12:28:44.436000+00:00",
+  "total_cost_usd": 1.1183612
 }

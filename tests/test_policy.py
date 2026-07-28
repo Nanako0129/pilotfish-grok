@@ -51,6 +51,10 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("before repository discovery or implementation", gate_text)
         self.assertIn("including user-initiated `/plan` sessions", gate_text)
         self.assertIn(
+            "Treat every security-sensitive implementation as risky for this gate",
+            gate_text,
+        )
+        self.assertIn(
             "spawn a fresh `plan-verifier` with `background: false`", gate_text
         )
         self.assertIn("exact target readiness-unit ID and kind", gate_text)
@@ -90,8 +94,8 @@ class PolicyTests(unittest.TestCase):
             "for that slice, the main session MUST successfully spawn `security-executor`",
             "every role other than `security-executor` MUST NOT implement that slice directly",
             "direct-work allowance, dispatch brake, coordination-cost heuristic, "
-            "matching-role-optional rule, single-unknown-bug exception, and "
-            "failed-attempt takeover rule do not waive",
+            "cue-free routing gate, single-unknown-bug exception, and "
+            "failed-attempt retry rule do not waive",
             "If the spawn is unavailable or fails, stop without source mutation "
             "or implementation tools",
             "If implementation attempts fail, stop or retask through `security-executor`",
@@ -99,10 +103,36 @@ class PolicyTests(unittest.TestCase):
         ):
             self.assertIn(phrase, gate_text)
         self.assertIn(
-            "The main session may take over only non-security-sensitive work; "
-            "a security-sensitive slice must stop or be retasked through `security-executor`",
+            "A security-sensitive slice must stop or be retasked through "
+            "`security-executor`",
             " ".join(policy.split()),
         )
+
+    def test_cue_free_dispatch_gate_requires_all_seven_roles(self) -> None:
+        policy = POLICY.read_text(encoding="utf-8")
+        gate = " ".join(
+            policy[
+                policy.index("### Cue-free dispatch gate") : policy.index(
+                    "For large, ambiguous, architectural"
+                )
+            ].split()
+        )
+
+        self.assertIn(
+            "even when the user never mentions agents, delegation, or this workflow",
+            " ".join(policy.split()),
+        )
+        for phrase in (
+            "spawn `scout` before any repository search that must locate an unknown file",
+            "Spawn `mech-executor` before a fully specified mechanical implementation",
+            "Spawn `executor` before a bounded non-security implementation",
+            "mandatory `security-reviewer`, `plan-verifier`, and `security-executor`",
+            "spawn a fresh `verifier`",
+            "routing gates, not prompt keywords",
+            "cannot turn matching work into main-session execution",
+            "do not silently perform its bounded work in the main session",
+        ):
+            self.assertIn(phrase, gate)
 
     def test_native_plan_lifecycle_requires_readiness_before_exit(self) -> None:
         policy = POLICY.read_text(encoding="utf-8")

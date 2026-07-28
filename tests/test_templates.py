@@ -189,7 +189,10 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("Explore", design)
         self.assertIn("policy names roles but never embeds", design)
         self.assertIn("plan mode", design.lower())
-        self.assertIn("Plan readiness is the deliberate exception", design)
+        self.assertIn(
+            "Plan readiness is the strict pre-approval instance of mandatory dispatch",
+            design,
+        )
 
 
 if __name__ == "__main__":

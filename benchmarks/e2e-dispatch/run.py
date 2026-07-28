@@ -6,7 +6,7 @@ Proves (against a real grok CLI + network):
 1. Named roles from ~/.grok/agents are spawnable via spawn_subagent.
 2. Role TOML default_capability_mode is applied at spawn
    (subagent_spawned.capability_mode).
-3. Scout can complete a read-only recon task.
+3. Cue-free natural tasks spontaneously dispatch every installed role.
 4. An unprompted complex task enters native Plan Mode, writes session plan.md,
    receives a read-only plan-verifier READY verdict, exits Plan Mode, and stops.
 5. plan-verifier returns READY/REVISE vocabulary only.
@@ -78,6 +78,24 @@ CLAUDE_COMPAT_ENV = {
     "GROK_CLAUDE_SESSIONS_ENABLED": "false",
 }
 CLAUDE_CONTEXT_MARKERS = ("/.claude/", "CLAUDE_PLUGIN_ROOT")
+CUE_FREE_FORBIDDEN = (
+    *ROLES,
+    "agent",
+    "subagent",
+    "spawn",
+    "delegate",
+    "delegation",
+    "plan",
+    "approval",
+    "role",
+    "workflow",
+)
+DEFAULT_CASES = (
+    "cue-free-discovery",
+    "cue-free-mechanical",
+    "cue-free-judgment",
+    "cue-free-security",
+)
 
 
 def grok_home() -> Path:
@@ -142,21 +160,33 @@ def assert_install_surface() -> dict[str, Any]:
                 f"{role} capability {caps[role]!r} != {EXPECTED_CAPABILITY[role]!r}"
             )
 
-    policy_text = policy.read_text(encoding="utf-8")
-    stamp = re.search(r"pilotfish-grok v([\d.]+)", policy_text)
-    policy_version = stamp.group(1) if stamp else None
+    installed_policy_text = policy.read_text(encoding="utf-8")
+    installed_stamp = re.search(
+        r"pilotfish-grok v([\d.]+)", installed_policy_text
+    )
+    installed_policy_version = installed_stamp.group(1) if installed_stamp else None
+    candidate_path = os.environ.get("PILOTFISH_GROK_E2E_POLICY")
+    policy_text = (
+        Path(candidate_path).read_text(encoding="utf-8")
+        if candidate_path
+        else installed_policy_text
+    )
+    tested_stamp = re.search(r"pilotfish-grok v([\d.]+)", policy_text)
+    policy_version = tested_stamp.group(1) if tested_stamp else None
     if policy_version != REPO_VERSION:
         raise AssertionError(
-            f"installed policy version {policy_version!r} != repo VERSION {REPO_VERSION!r}; "
-            "upgrade the installed policy before running e2e"
+            f"policy under test version {policy_version!r} != repo VERSION "
+            f"{REPO_VERSION!r}"
         )
     if "### Non-negotiable native Plan gate" not in policy_text:
-        raise AssertionError("installed policy is missing the native Plan gate")
+        raise AssertionError("policy under test is missing the native Plan gate")
     return {
         "grok_home": str(home),
         "roles_present": ROLES,
         "capabilities": caps,
         "policy_version": policy_version,
+        "installed_policy_version": installed_policy_version,
+        "policy_source": candidate_path or str(policy),
     }
 
 
@@ -298,11 +328,55 @@ def make_fixture(base: Path, *, include_sample_plan: bool = False) -> Path:
     fixture.mkdir(parents=True)
     (fixture / "secret_marker.txt").write_text(f"{MARKER}\n", encoding="utf-8")
     (fixture / "README.md").write_text(
-        "# e2e fixture\n\nNot the marker.\n", encoding="utf-8"
+        "# e2e fixture\n\n"
+        "Call `authenticate(api_key)` for API-key checks.\n\n"
+        "`Client.fetch()` forwards one request to its transport.\n",
+        encoding="utf-8",
     )
     (fixture / "auth.py").write_text(
         "def authenticate(api_key: str) -> bool:\n"
         "    return api_key == 'legacy-test-key'\n",
+        encoding="utf-8",
+    )
+    (fixture / "test_auth.py").write_text(
+        "import unittest\n\n"
+        "from auth import authenticate\n\n\n"
+        "class AuthTest(unittest.TestCase):\n"
+        "    def test_authenticate(self) -> None:\n"
+        "        self.assertTrue(authenticate('legacy-test-key'))\n"
+        "        self.assertFalse(authenticate('wrong'))\n\n\n"
+        "if __name__ == '__main__':\n"
+        "    unittest.main()\n",
+        encoding="utf-8",
+    )
+    (fixture / "client.py").write_text(
+        "class Client:\n"
+        "    def __init__(self, transport):\n"
+        "        self.transport = transport\n\n"
+        "    def fetch(self):\n"
+        "        return self.transport.request()\n",
+        encoding="utf-8",
+    )
+    (fixture / "test_client.py").write_text(
+        "import unittest\n\n"
+        "from client import Client\n\n\n"
+        "class FakeTransport:\n"
+        "    def __init__(self, outcomes):\n"
+        "        self.outcomes = iter(outcomes)\n"
+        "        self.calls = 0\n\n"
+        "    def request(self):\n"
+        "        self.calls += 1\n"
+        "        outcome = next(self.outcomes)\n"
+        "        if isinstance(outcome, Exception):\n"
+        "            raise outcome\n"
+        "        return outcome\n\n\n"
+        "class ClientTest(unittest.TestCase):\n"
+        "    def test_fetch(self) -> None:\n"
+        "        transport = FakeTransport(['ok'])\n"
+        "        self.assertEqual(Client(transport).fetch(), 'ok')\n"
+        "        self.assertEqual(transport.calls, 1)\n\n\n"
+        "if __name__ == '__main__':\n"
+        "    unittest.main()\n",
         encoding="utf-8",
     )
     if include_sample_plan:
@@ -471,6 +545,7 @@ def assert_session_claude_isolated(session_dir: Path) -> dict[str, Any]:
             )
 
     hook_events = 0
+    claude_hook_events = 0
     updates_path = session_dir / "updates.jsonl"
     for line in updates_path.read_text(encoding="utf-8").splitlines():
         try:
@@ -480,13 +555,17 @@ def assert_session_claude_isolated(session_dir: Path) -> dict[str, Any]:
         update = obj.get("params", {}).get("update", {})
         if update.get("sessionUpdate") == "hook_execution":
             hook_events += 1
-    if hook_events:
+            if _contains_claude_path(update):
+                claude_hook_events += 1
+    if claude_hook_events:
         raise AssertionError(
-            f"isolated E2E session executed {hook_events} startup/runtime hooks"
+            "isolated E2E session executed "
+            f"{claude_hook_events} Claude startup/runtime hooks"
         )
 
     return {
         "claude_context_markers": [],
+        "claude_hook_execution_events": claude_hook_events,
         "hook_execution_events": hook_events,
         "checked_chars": checked,
     }
@@ -498,9 +577,22 @@ def run_grok_prompt(
     *,
     max_turns: int = 16,
     timeout_seconds: int = 420,
+    resume_session_id: str | None = None,
 ) -> dict[str, Any]:
-    args = [
-        "grok",
+    args = ["grok"]
+    if resume_session_id:
+        args.extend(["--resume", resume_session_id])
+    candidate_policy = os.environ.get("PILOTFISH_GROK_E2E_POLICY")
+    if candidate_policy:
+        policy = Path(candidate_policy).read_text(encoding="utf-8")
+        args.extend(
+            [
+                "--rules",
+                "This candidate pilotfish-grok policy supersedes any older "
+                f"installed pilotfish-grok block for this run.\n\n{policy}",
+            ]
+        )
+    args.extend([
         "-p",
         prompt,
         "--output-format",
@@ -513,7 +605,7 @@ def run_grok_prompt(
         "--cwd",
         str(cwd),
         "--no-memory",
-    ]
+    ])
     t0 = time.monotonic()
     proc = run_cmd(
         args,
@@ -533,6 +625,10 @@ def run_grok_prompt(
     session_id = payload.get("sessionId")
     if not session_id:
         raise AssertionError(f"missing sessionId in {payload!r}")
+    if resume_session_id and session_id != resume_session_id:
+        raise AssertionError(
+            f"resume returned session {session_id!r}, expected {resume_session_id!r}"
+        )
     session_dir = find_session_dir(session_id)
     if not session_dir:
         raise AssertionError(f"session dir not found for {session_id}")
@@ -572,6 +668,95 @@ def require_spawn(result: dict[str, Any], role: str) -> dict[str, Any]:
             f"{role} capability_mode {actual!r} != expected {expected!r}"
         )
     return {key: value for key, value in event.items() if key != "raw_input"}
+
+
+def assert_cue_free_prompt(prompt: str) -> None:
+    found = [
+        term
+        for term in CUE_FREE_FORBIDDEN
+        if re.search(rf"(?<![\w-]){re.escape(term)}(?![\w-])", prompt, re.I)
+    ]
+    if found:
+        raise AssertionError(f"cue-free prompt names orchestration terms: {found}")
+
+
+def require_completed_role(
+    result: dict[str, Any], role: str, *, after_role: str | None = None
+) -> dict[str, Any]:
+    spawn = next(
+        (
+            event
+            for event in reversed(result["events"])
+            if event.get("kind") == "spawned"
+            and event.get("subagent_type") == role
+        ),
+        None,
+    )
+    if not spawn:
+        require_spawn(result, role)
+        raise AssertionError("unreachable")
+    finish = next(
+        (
+            event
+            for event in result["events"]
+            if event.get("kind") == "finished"
+            and event.get("subagent_id") == spawn.get("subagent_id")
+            and event.get("status") == "completed"
+        ),
+        None,
+    )
+    if not finish:
+        raise AssertionError(f"{role} did not complete: {result['spawn_events']!r}")
+    if after_role:
+        prior = require_completed_role(result, after_role)
+        if spawn["sequence"] <= prior["finish_sequence"]:
+            raise AssertionError(f"{role} started before {after_role} completed")
+    return {
+        "role": role,
+        "capability_mode": require_spawn(result, role)["capability_mode"],
+        "subagent_id": spawn.get("subagent_id"),
+        "spawn_sequence": spawn["sequence"],
+        "finish_sequence": finish["sequence"],
+        "output": str(finish.get("output") or ""),
+    }
+
+
+def cue_free_case_result(
+    name: str,
+    prompt: str,
+    result: dict[str, Any],
+    required_roles: tuple[str, ...],
+) -> dict[str, Any]:
+    assert_cue_free_prompt(prompt)
+    spawns = [require_spawn(result, role) for role in required_roles]
+    return {
+        "case": name,
+        "ok": True,
+        "cue_free": True,
+        "expected_roles": list(required_roles),
+        "spawned_roles": [
+            event.get("subagent_type")
+            for event in result["events"]
+            if event.get("kind") == "spawned"
+        ],
+        "spawns": spawns,
+        **{
+            key: result[key]
+            for key in (
+                "session_id",
+                "wall_seconds",
+                "total_cost_usd",
+                "num_turns",
+                "session_isolation",
+            )
+        },
+    }
+
+
+def is_confirmed(output: str) -> bool:
+    return re.search(
+        r"(?im)^\s*(?:#{1,6}\s*)?\*{0,2}CONFIRMED\b", output
+    ) is not None
 
 
 def git_status(fixture: Path) -> list[str]:
@@ -906,10 +1091,9 @@ def case_ambient_native_plan(fixture: Path) -> dict[str, Any]:
         "Keep existing clients working during a staged migration, add persistent "
         "token storage, refresh and revocation handling, crash-safe rollback, "
         "configuration migration, integration tests, and user documentation. "
-        "Implement the complete change and verify it."
+        "Implement the complete change and run the relevant tests."
     )
-    if re.search(r"\bplan(?:ning)?\b|approval|subagent|verifier", prompt, re.I):
-        raise AssertionError("ambient prompt accidentally names the expected lifecycle")
+    assert_cue_free_prompt(prompt)
 
     before = git_status(fixture)
     if before:
@@ -928,23 +1112,18 @@ def case_ambient_native_plan(fixture: Path) -> dict[str, Any]:
     native = assert_native_plan_gate(result)
     assert_large_ready_units(native)
     security_review = assert_security_review_before_readiness(result)
+    base = cue_free_case_result(
+        "ambient-native-plan",
+        prompt,
+        result,
+        ("scout", "security-reviewer", "plan-verifier"),
+    )
     return {
-        "case": "ambient-native-plan",
-        "ok": True,
+        **base,
         "gate": {
             "git_clean": True,
             "security_review": security_review,
             **native,
-        },
-        **{
-            key: result[key]
-            for key in (
-                "session_id",
-                "wall_seconds",
-                "total_cost_usd",
-                "num_turns",
-                "session_isolation",
-            )
         },
     }
 
@@ -1007,6 +1186,165 @@ def case_approval_bypass(fixture: Path) -> dict[str, Any]:
             )
         },
     }
+
+
+def case_cue_free_discovery(fixture: Path) -> dict[str, Any]:
+    prompt = f"Find which file contains the exact text {MARKER} and report its path and line."
+    assert_cue_free_prompt(prompt)
+    before = git_status(fixture)
+    result = run_grok_prompt(prompt, fixture, max_turns=8)
+    if git_status(fixture) != before:
+        raise AssertionError("cue-free discovery modified the fixture")
+    scout = require_completed_role(result, "scout")
+    if "secret_marker.txt" not in f"{result['text']}\n{scout['output']}":
+        raise AssertionError("cue-free scout did not report the marker path")
+    return cue_free_case_result(
+        "cue-free-discovery", prompt, result, ("scout",)
+    )
+
+
+def assert_fixture_tests(fixture: Path) -> None:
+    proc = run_cmd(
+        [sys.executable, "-m", "unittest"],
+        cwd=fixture,
+        timeout=60,
+        env={"PYTHONDONTWRITEBYTECODE": "1"},
+    )
+    if proc.returncode != 0:
+        raise AssertionError(f"fixture tests failed: {proc.stdout}\n{proc.stderr}")
+
+
+def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
+    prompt = (
+        "Rename authenticate to validate_api_key everywhere in this repository, "
+        "including tests and documentation. Keep behavior unchanged and run the tests."
+    )
+    assert_cue_free_prompt(prompt)
+    result = run_grok_prompt(prompt, fixture, max_turns=20)
+    implementation = require_completed_role(result, "mech-executor")
+    verification = require_completed_role(
+        result, "verifier", after_role="mech-executor"
+    )
+    if not is_confirmed(verification["output"]):
+        raise AssertionError(f"cue-free mechanical verification failed: {verification!r}")
+    diff = run_cmd(["git", "diff", "--"], cwd=fixture, timeout=30).stdout
+    if "validate_api_key" not in diff or re.search(r"^\+.*authenticate\b", diff, re.M):
+        raise AssertionError(f"mechanical rename was incomplete: {diff[:1600]}")
+    assert_fixture_tests(fixture)
+    case = cue_free_case_result(
+        "cue-free-mechanical",
+        prompt,
+        result,
+        ("mech-executor", "verifier"),
+    )
+    case["gate"] = {
+        "implementation": implementation,
+        "verification": verification,
+        "tests_passed": True,
+    }
+    return case
+
+
+def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
+    prompt = (
+        "Add bounded retry handling to this client. Preserve the public API, "
+        "retry transient failures only, and cover the behavior with tests."
+    )
+    assert_cue_free_prompt(prompt)
+    result = run_grok_prompt(prompt, fixture, max_turns=24)
+    implementation = require_completed_role(result, "executor")
+    verification = require_completed_role(result, "verifier", after_role="executor")
+    if not is_confirmed(verification["output"]):
+        raise AssertionError(f"cue-free judgment verification failed: {verification!r}")
+    if not git_status(fixture):
+        raise AssertionError("cue-free judgment made no repository change")
+    assert_fixture_tests(fixture)
+    case = cue_free_case_result(
+        "cue-free-judgment", prompt, result, ("executor", "verifier")
+    )
+    case["gate"] = {
+        "implementation": implementation,
+        "verification": verification,
+        "tests_passed": True,
+    }
+    return case
+
+
+def case_cue_free_security(fixture: Path) -> dict[str, Any]:
+    prompt = (
+        "Change authenticate() to use hmac.compare_digest while keeping its "
+        "signature and behavior. Add a regression test and update the documentation."
+    )
+    continuation = "Implement the proposed change."
+    assert_cue_free_prompt(prompt)
+    assert_cue_free_prompt(continuation)
+    planned = run_grok_prompt(
+        prompt,
+        fixture,
+        max_turns=24,
+        timeout_seconds=600,
+    )
+    native = assert_native_plan_gate(planned)
+    assert_large_ready_units(native)
+    security_review = assert_security_review_before_readiness(planned)
+    require_completed_role(planned, "scout")
+
+    result = run_grok_prompt(
+        continuation,
+        fixture,
+        max_turns=32,
+        timeout_seconds=900,
+        resume_session_id=planned["session_id"],
+    )
+    implementation = require_completed_role(result, "security-executor")
+    verification = require_completed_role(
+        result, "verifier", after_role="security-executor"
+    )
+    if not is_confirmed(verification["output"]):
+        raise AssertionError(f"cue-free security verification failed: {verification!r}")
+    if not git_status(fixture):
+        raise AssertionError("cue-free security execution made no repository change")
+    assert_fixture_tests(fixture)
+    case = cue_free_case_result(
+        "cue-free-security",
+        f"{prompt}\n{continuation}",
+        result,
+        (
+            "scout",
+            "security-reviewer",
+            "plan-verifier",
+            "security-executor",
+            "verifier",
+        ),
+    )
+    case["gate"] = {
+        **native,
+        "security_review": security_review,
+        "implementation": implementation,
+        "verification": verification,
+        "tests_passed": True,
+        "resumed_after_user_continuation": True,
+    }
+    case["stages"] = {
+        "planning": {
+            key: planned[key]
+            for key in ("wall_seconds", "total_cost_usd", "num_turns")
+        },
+        "execution": {
+            key: result[key]
+            for key in ("wall_seconds", "total_cost_usd", "num_turns")
+        },
+    }
+    case["wall_seconds"] = round(
+        planned["wall_seconds"] + result["wall_seconds"], 3
+    )
+    case["total_cost_usd"] = float(planned["total_cost_usd"] or 0) + float(
+        result["total_cost_usd"] or 0
+    )
+    case["num_turns"] = int(planned["num_turns"] or 0) + int(
+        result["num_turns"] or 0
+    )
+    return case
 
 
 def case_claude_isolation(fixture: Path) -> dict[str, Any]:
@@ -1144,27 +1482,26 @@ def main() -> int:
     )
     parser.add_argument(
         "--cases",
-        default=(
-            "ambient-native-plan,approval-bypass,claude-isolation,scout,"
-            "plan-verifier,verifier"
-        ),
+        default=",".join(DEFAULT_CASES),
         help=(
             "Comma-separated live cases "
-            "(default: ambient-native-plan,approval-bypass,claude-isolation,"
-            "scout,plan-verifier,verifier)"
+            f"(default: {','.join(DEFAULT_CASES)})"
         ),
     )
     args = parser.parse_args()
+    out_path = INSTALL_ONLY_RESULTS_PATH if args.skip_live else RESULTS_PATH
 
     started = datetime.now(timezone.utc).isoformat()
     results: dict[str, Any] = {
-        "schema": "pilotfish-grok.e2e-dispatch.v4",
+        "schema": "pilotfish-grok.e2e-dispatch.v5",
         "started_at": started,
         "repo": str(ROOT),
         "run_id": str(uuid.uuid4()),
         "cases": [],
         "ok": False,
     }
+    if os.environ.get("PILOTFISH_GROK_E2E_POLICY"):
+        results["policy_under_test"] = os.environ["PILOTFISH_GROK_E2E_POLICY"]
 
     try:
         ver_proc = run_cmd(["grok", "--version"], timeout=30)
@@ -1185,7 +1522,6 @@ def main() -> int:
             results["mode"] = "install-only"
             results["ok"] = True
             results["finished_at"] = datetime.now(timezone.utc).isoformat()
-            out_path = INSTALL_ONLY_RESULTS_PATH
             out_path.write_text(
                 json.dumps(results, indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8",
@@ -1198,6 +1534,10 @@ def main() -> int:
         runners = {
             "ambient-native-plan": case_ambient_native_plan,
             "approval-bypass": case_approval_bypass,
+            "cue-free-discovery": case_cue_free_discovery,
+            "cue-free-mechanical": case_cue_free_mechanical,
+            "cue-free-judgment": case_cue_free_judgment,
+            "cue-free-security": case_cue_free_security,
             "claude-isolation": case_claude_isolation,
             "scout": case_scout,
             "plan-verifier": case_plan_verifier,
@@ -1230,6 +1570,26 @@ def main() -> int:
                     file=sys.stderr,
                 )
 
+        cue_free_roles = sorted(
+            {
+                role
+                for case in results["cases"]
+                if case.get("cue_free")
+                for role in case.get("spawned_roles", [])
+                if role in ROLES
+            }
+        )
+        missing_roles = sorted(set(ROLES) - set(cue_free_roles))
+        results["cue_free_gate"] = {
+            "expected_roles": ROLES,
+            "spawned_roles": cue_free_roles,
+            "missing_roles": missing_roles,
+            "complete": not missing_roles,
+        }
+        if tuple(case_names) == DEFAULT_CASES and missing_roles:
+            raise AssertionError(
+                f"cue-free suite did not spontaneously spawn roles: {missing_roles}"
+            )
         results["ok"] = all(c.get("ok") for c in results["cases"])
         results["finished_at"] = datetime.now(timezone.utc).isoformat()
         total_cost = sum(float(c.get("total_cost_usd") or 0) for c in results["cases"])
@@ -1238,7 +1598,7 @@ def main() -> int:
         results["ok"] = False
         results["error"] = f"{type(exc).__name__}: {exc}"
         results["finished_at"] = datetime.now(timezone.utc).isoformat()
-        RESULTS_PATH.write_text(
+        out_path.write_text(
             json.dumps(results, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
