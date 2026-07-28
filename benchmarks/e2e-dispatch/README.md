@@ -67,8 +67,8 @@ latency benchmark.
 The original v1.0.3 record ran before Claude compatibility isolation was added
 and is retained in the research report only as contaminated historical
 evidence. The accepted v1.0.6 candidate `results.json` is run
-`4f8813be-10ab-449c-946b-253d504d8061`: all four cue-free cases passed in
-527.459 seconds of aggregate case time with `$1.201198` in client cost fields,
+`7267535d-60d8-477c-b978-71ae06dd754f`: all four cue-free cases passed in
+510.987 seconds of aggregate case time with `$1.106448` in client cost fields,
 and their persisted spawn events covered all seven roles. The artifact records
 the source policy override as v1.0.6 and the then-installed global policy as
 v1.0.5 rather than conflating candidate behavior with installation state.

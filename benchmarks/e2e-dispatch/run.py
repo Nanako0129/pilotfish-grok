@@ -30,6 +30,7 @@ roles installed under ~/.grok (or GROK_HOME).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -737,7 +738,14 @@ def require_role_owned_implementation(
     exclusive: bool = False,
 ) -> dict[str, Any]:
     implementation = require_completed_role(result, role, after_role=after_role)
+    implementation_spawn = next(
+        event
+        for event in result["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_id") == implementation["subagent_id"]
+    )
     parent_verification_tools = []
+    parent_integration_tools = []
     parent_mutations = []
     for event in result["events"]:
         if (
@@ -752,6 +760,14 @@ def require_role_owned_implementation(
             event.get("raw_input")
         ):
             parent_verification_tools.append(event.get("tool"))
+            continue
+        if is_worktree_cherry_pick(
+            event,
+            implementation_spawn,
+            implementation["output"],
+            implementation["finish_sequence"],
+        ):
+            parent_integration_tools.append(event.get("tool"))
             continue
         parent_mutations.append(event)
     if parent_mutations:
@@ -775,6 +791,7 @@ def require_role_owned_implementation(
         )
     implementation["parent_mutation_tools"] = []
     implementation["parent_verification_tools"] = parent_verification_tools
+    implementation["parent_integration_tools"] = parent_integration_tools
     if exclusive:
         implementation["alternate_write_capable_spawns"] = []
     return implementation
@@ -801,6 +818,40 @@ def is_unittest_command(raw_input: Any) -> bool:
         ):
             return False
     return True
+
+
+def is_worktree_cherry_pick(
+    event: dict[str, Any],
+    spawn: dict[str, Any],
+    output: str,
+    finish_sequence: int,
+) -> bool:
+    raw_input = spawn.get("raw_input")
+    command_input = event.get("raw_input")
+    if (
+        not isinstance(raw_input, dict)
+        or raw_input.get("isolation") != "worktree"
+        or event.get("tool") != "run_terminal_command"
+        or event.get("sequence", -1) <= finish_sequence
+        or not isinstance(command_input, dict)
+    ):
+        return False
+    command = command_input.get("command")
+    if not isinstance(command, str) or any(
+        separator in command
+        for separator in ("\n", "\r", ";", "|", "&", "`", "$(", ">", "<")
+    ):
+        return False
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return False
+    return (
+        len(argv) == 3
+        and argv[:2] == ["git", "cherry-pick"]
+        and re.fullmatch(r"[0-9a-fA-F]{7,40}", argv[2]) is not None
+        and argv[2].lower() in output.lower()
+    )
 
 
 def require_bound_verifier(
@@ -883,6 +934,35 @@ def git_status(fixture: Path) -> list[str]:
     if proc.returncode != 0:
         raise AssertionError(f"git status failed: {proc.stderr or proc.stdout}")
     return [line for line in proc.stdout.splitlines() if line]
+
+
+def source_snapshot(fixture: Path) -> dict[str, str]:
+    return {
+        str(path.relative_to(fixture)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(fixture.rglob("*"))
+        if path.is_file()
+        and ".git" not in path.relative_to(fixture).parts
+        and "__pycache__" not in path.relative_to(fixture).parts
+        and path.suffix != ".pyc"
+    }
+
+
+def require_scout_before_parent_tools(result: dict[str, Any]) -> dict[str, Any]:
+    scout = require_completed_role(result, "scout")
+    prior_parent_tools = [
+        event
+        for event in result["events"]
+        if event.get("kind") == "tool_call"
+        and event.get("tool") != "spawn_subagent"
+        and event.get("sequence", -1) < scout["spawn_sequence"]
+    ]
+    if prior_parent_tools:
+        raise AssertionError(
+            "parent used repository tools before scout dispatch: "
+            f"{[event.get('tool') for event in prior_parent_tools]!r}"
+        )
+    scout["parent_tools_before_scout"] = []
+    return scout
 
 
 def readiness_target(prompt: str) -> dict[str, str] | None:
@@ -1315,12 +1395,14 @@ def case_cue_free_discovery(fixture: Path) -> dict[str, Any]:
     result = run_grok_prompt(prompt, fixture, max_turns=8)
     if git_status(fixture) != before:
         raise AssertionError("cue-free discovery modified the fixture")
-    scout = require_completed_role(result, "scout")
+    scout = require_scout_before_parent_tools(result)
     if "secret_marker.txt" not in f"{result['text']}\n{scout['output']}":
         raise AssertionError("cue-free scout did not report the marker path")
-    return cue_free_case_result(
+    case = cue_free_case_result(
         "cue-free-discovery", prompt, result, ("scout",)
     )
+    case["gate"] = {"discovery": scout}
+    return case
 
 
 def assert_fixture_tests(fixture: Path) -> None:
@@ -1341,8 +1423,9 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
     )
     assert_cue_free_prompt(prompt)
     result = run_grok_prompt(prompt, fixture, max_turns=20)
+    scout = require_scout_before_parent_tools(result)
     implementation = require_role_owned_implementation(
-        result, "mech-executor", after_role="scout"
+        result, "mech-executor", after_role="scout", exclusive=True
     )
     verification = require_bound_verifier(
         result,
@@ -1373,6 +1456,7 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
         ("scout", "mech-executor", "verifier"),
     )
     case["gate"] = {
+        "discovery": scout,
         "implementation": implementation,
         "verification": verification,
         "tests_passed": True,
@@ -1387,7 +1471,9 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
     )
     assert_cue_free_prompt(prompt)
     result = run_grok_prompt(prompt, fixture, max_turns=24)
-    implementation = require_role_owned_implementation(result, "executor")
+    implementation = require_role_owned_implementation(
+        result, "executor", exclusive=True
+    )
     verification = require_bound_verifier(
         result,
         after_role="executor",
@@ -1421,9 +1507,9 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
     continuation = "Implement the proposed change."
     assert_cue_free_prompt(prompt)
     assert_cue_free_prompt(continuation)
-    before = git_status(fixture)
-    if before:
-        raise AssertionError(f"security fixture was not clean before planning: {before!r}")
+    if git_status(fixture):
+        raise AssertionError("security fixture was not clean before planning")
+    before = source_snapshot(fixture)
     planned = run_grok_prompt(
         prompt,
         fixture,
@@ -1434,7 +1520,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
     assert_large_ready_units(native)
     security_review = assert_security_review_before_readiness(planned)
     require_completed_role(planned, "scout")
-    if git_status(fixture) != before:
+    if source_snapshot(fixture) != before:
         raise AssertionError("security planning turn modified the fixture before approval")
 
     result = run_grok_prompt(
@@ -1481,6 +1567,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
         "implementation": implementation,
         "verification": verification,
         "git_clean_before_approval": True,
+        "source_unchanged_before_approval": True,
         "tests_passed": True,
         "resumed_after_user_continuation": True,
     }

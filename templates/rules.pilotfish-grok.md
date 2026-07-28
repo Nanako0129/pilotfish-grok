@@ -204,10 +204,13 @@ re-task the leaf with the captured result.
 Never swap `plan-verifier` and `verifier`. The former challenges Plan readiness
 with `READY` / `REVISE`; the latter reproduces tests and challenges a
 completed-work claim with `CONFIRMED` / `REFUTED`. Neither role writes the Plan
-or fixes findings. After a concrete `REFUTED`, materially fix the same claim
-before using a fresh verifier. After two consecutive `REFUTED` verdicts for
-that claim, stop automatic fix-and-reverify cycling and surface the failures
-and options to the user; the cap is not `CONFIRMED`, and user-directed
-continuation remains allowed. Do not reverify a substantially unchanged
-implementation. Final judgment remains in the main session.
+or fixes findings. Every verifier brief must require its first non-whitespace
+token to be exactly `CONFIRMED` or `REFUTED`, with no heading before it and no
+conflicting verdict anywhere in the output. After a concrete `REFUTED`,
+materially fix the same claim before using a fresh verifier. After two
+consecutive `REFUTED` verdicts for that claim, stop automatic
+fix-and-reverify cycling and surface the failures and options to the user; the
+cap is not `CONFIRMED`, and user-directed continuation remains allowed. Do not
+reverify a substantially unchanged implementation. Final judgment remains in
+the main session.
 <!-- pilotfish-grok:end -->

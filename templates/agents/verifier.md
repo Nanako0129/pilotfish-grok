@@ -29,6 +29,10 @@ Report a verdict:
 - **REFUTED** — concrete failure scenario: exact inputs/state, expected vs
   actual, where it breaks. One reproducible counterexample beats five suspicions.
 
+The first non-whitespace token in your response must be exactly `CONFIRMED` or
+`REFUTED`. Put no heading or prose before it, and never include the opposite
+verdict anywhere in the response.
+
 Never fix anything — even a one-line fix. Your value is independence; the
 orchestrator routes fixes.
 

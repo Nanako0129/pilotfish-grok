@@ -291,6 +291,91 @@ class E2EDispatchTests(unittest.TestCase):
                 exclusive=True,
             )
 
+    def test_worktree_cherry_pick_is_executor_owned_integration(self) -> None:
+        runner = load_runner_module()
+        events = [
+            {
+                "kind": "spawned",
+                "sequence": 1,
+                "subagent_type": "executor",
+                "capability_mode": "all",
+                "subagent_id": "executor-worktree",
+                "raw_input": {"isolation": "worktree"},
+            },
+            {
+                "kind": "finished",
+                "sequence": 2,
+                "subagent_id": "executor-worktree",
+                "status": "completed",
+                "output": "Implemented and committed as abc1234.",
+            },
+            {
+                "kind": "tool_call",
+                "sequence": 3,
+                "tool": "run_terminal_command",
+                "raw_input": {"command": "git cherry-pick abc1234"},
+            },
+        ]
+        result = {"events": events, "spawn_events": events, "text": ""}
+        implementation = runner.require_role_owned_implementation(result, "executor")
+        self.assertEqual(
+            implementation["parent_integration_tools"],
+            ["run_terminal_command"],
+        )
+
+        events[2]["raw_input"]["command"] = "git cherry-pick def5678"
+        with self.assertRaisesRegex(AssertionError, "parent session mutated"):
+            runner.require_role_owned_implementation(result, "executor")
+
+    def test_scout_must_precede_parent_repository_tools(self) -> None:
+        runner = load_runner_module()
+        events = [
+            {
+                "kind": "tool_call",
+                "sequence": 1,
+                "tool": "search",
+                "read_only": True,
+            },
+            {
+                "kind": "spawned",
+                "sequence": 2,
+                "subagent_type": "scout",
+                "capability_mode": "read-only",
+                "subagent_id": "scout-1",
+            },
+            {
+                "kind": "finished",
+                "sequence": 3,
+                "subagent_id": "scout-1",
+                "status": "completed",
+                "output": "Found it.",
+            },
+        ]
+        result = {"events": events, "spawn_events": events, "text": ""}
+        with self.assertRaisesRegex(AssertionError, "before scout dispatch"):
+            runner.require_scout_before_parent_tools(result)
+
+        events[0]["sequence"] = 4
+        scout = runner.require_scout_before_parent_tools(result)
+        self.assertEqual(scout["parent_tools_before_scout"], [])
+
+    def test_source_snapshot_ignores_git_index_hiding(self) -> None:
+        runner = load_runner_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = runner.make_fixture(Path(tmp))
+            before = runner.source_snapshot(fixture)
+            (fixture / "auth.py").write_text(
+                "def authenticate(api_key: str) -> bool:\n    return False\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "update-index", "--assume-unchanged", "auth.py"],
+                cwd=fixture,
+                check=True,
+            )
+            self.assertEqual(runner.git_status(fixture), [])
+            self.assertNotEqual(runner.source_snapshot(fixture), before)
+
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
         updates = [
@@ -745,6 +830,7 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertTrue(gate["ready_before_exit"])
         self.assertTrue(gate["awaiting_native_approval"])
         self.assertTrue(gate["git_clean_before_approval"])
+        self.assertTrue(gate["source_unchanged_before_approval"])
         self.assertEqual(gate["write_capable_spawns"], [])
         self.assertTrue(gate["security_review"]["finished_before_readiness"])
         self.assertTrue(gate["resumed_after_user_continuation"])
@@ -755,6 +841,18 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertEqual(
             cases["cue-free-mechanical"]["expected_roles"],
             ["scout", "mech-executor", "verifier"],
+        )
+        self.assertEqual(
+            cases["cue-free-discovery"]["gate"]["discovery"][
+                "parent_tools_before_scout"
+            ],
+            [],
+        )
+        self.assertEqual(
+            cases["cue-free-mechanical"]["gate"]["discovery"][
+                "parent_tools_before_scout"
+            ],
+            [],
         )
         self.assertIn(
             "bounded",
@@ -768,6 +866,12 @@ class E2EDispatchTests(unittest.TestCase):
             case_gate = cases[case_name]["gate"]
             self.assertEqual(
                 case_gate["implementation"]["parent_mutation_tools"], []
+            )
+            self.assertEqual(
+                case_gate["implementation"]["parent_integration_tools"], []
+            )
+            self.assertEqual(
+                case_gate["implementation"]["alternate_write_capable_spawns"], []
             )
             self.assertTrue(case_gate["verification"]["claim_terms"])
         self.assertTrue(payload["cue_free_gate"]["complete"])

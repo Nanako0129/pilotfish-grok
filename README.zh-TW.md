@@ -151,7 +151,7 @@ flowchart LR
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

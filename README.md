@@ -172,7 +172,7 @@ not turn that into a sequential `scout` → `executor` pipeline.
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

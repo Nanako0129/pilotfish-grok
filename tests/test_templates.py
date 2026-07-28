@@ -78,6 +78,10 @@ class TemplateContractTests(unittest.TestCase):
 
         self.assertIn("CONFIRMED", outcome)
         self.assertIn("REFUTED", outcome)
+        self.assertIn("first non-whitespace token", outcome)
+        self.assertIn(
+            "never include the opposite verdict", " ".join(outcome.split())
+        )
         self.assertNotIn("READY", outcome)
         self.assertNotIn("REVISE", outcome)
 
@@ -175,9 +179,13 @@ class TemplateContractTests(unittest.TestCase):
 
     def test_readme_matches_seven_role_contract(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        readme_zh = (ROOT / "README.zh-TW.md").read_text(encoding="utf-8")
+        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         self.assertIn("seven", readme.lower())
         self.assertIn("Explore", readme)
         self.assertIn("~/.grok/", readme)
+        self.assertIn(f"--branch v{version}", readme)
+        self.assertIn(f"--branch v{version}", readme_zh)
 
         for role in ROUTING:
             self.assertIn(f"`{role}`", readme)

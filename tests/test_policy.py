@@ -177,6 +177,8 @@ class PolicyTests(unittest.TestCase):
             "the cap is not `CONFIRMED`",
             "user-directed continuation remains allowed",
             "substantially unchanged implementation",
+            "first non-whitespace token to be exactly `CONFIRMED` or `REFUTED`",
+            "no conflicting verdict anywhere",
         ):
             self.assertIn(phrase, " ".join(policy.split()))
 
