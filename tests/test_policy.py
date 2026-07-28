@@ -131,6 +131,7 @@ class PolicyTests(unittest.TestCase):
             "the first tool after mandatory `enter_plan_mode`",
             "must not search or read the repository first",
             "`scout` must finish before `mech-executor` starts",
+            "failure semantics as engineering judgment for `executor`",
             "For non-security work, spawn `mech-executor` before a fully specified",
             "For non-security work, spawn `executor` before a bounded implementation",
             "spawn a fresh `verifier`",

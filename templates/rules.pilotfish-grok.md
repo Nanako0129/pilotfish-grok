@@ -113,6 +113,9 @@ to name a role:
   first.
 - Treat a repository-wide rename across source, tests, and documentation as
   cross-file reconnaissance: `scout` must finish before `mech-executor` starts.
+- Treat a non-security retry or error-handling change that must choose bounds
+  or failure semantics as engineering judgment for `executor`, even when the
+  source and test paths are explicit.
 - For non-security work, spawn `mech-executor` before a fully specified
   mechanical implementation that must keep multiple files or surfaces
   consistent.

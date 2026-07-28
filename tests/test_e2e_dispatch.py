@@ -130,14 +130,18 @@ class E2EDispatchTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(AssertionError, "orchestration terms"):
                 runner.assert_cue_free_prompt(prompt)
-        for verdict in ("CONFIRMED", "**CONFIRMED**", "## **CONFIRMED**\nEvidence"):
+        for verdict in ("CONFIRMED", "\n  CONFIRMED\nEvidence"):
             self.assertTrue(runner.is_confirmed(verdict))
-        self.assertFalse(runner.is_confirmed("REFUTED"))
-        self.assertFalse(runner.is_confirmed("Evidence\nCONFIRMED"))
-        self.assertFalse(
-            runner.is_confirmed("REFUTED\nCONFIRMED behavior would require more")
-        )
-        self.assertFalse(runner.is_confirmed("CONFIRMED\nREFUTED by this probe"))
+        for verdict in (
+            "**CONFIRMED**",
+            "## CONFIRMED\nEvidence",
+            "REFUTED",
+            "Evidence\nCONFIRMED",
+            "REFUTED\nCONFIRMED behavior would require more",
+            "CONFIRMED\nREFUTED by this probe",
+            "CONFIRMED\nNo REFUTED verdict was applicable",
+        ):
+            self.assertFalse(runner.is_confirmed(verdict))
 
     def test_executor_ownership_and_verifier_claim_are_enforced(self) -> None:
         runner = load_runner_module()
@@ -310,10 +314,25 @@ class E2EDispatchTests(unittest.TestCase):
                 "output": "Implemented and committed as abc1234.",
             },
             {
-                "kind": "tool_call",
+                "kind": "spawned",
                 "sequence": 3,
+                "subagent_type": "verifier",
+                "capability_mode": "execute",
+                "subagent_id": "verifier-before-integration",
+                "raw_input": {"prompt": "Verify client.py and test_client.py."},
+            },
+            {
+                "kind": "tool_call",
+                "sequence": 4,
                 "tool": "run_terminal_command",
                 "raw_input": {"command": "git cherry-pick abc1234"},
+            },
+            {
+                "kind": "finished",
+                "sequence": 6,
+                "subagent_id": "verifier-before-integration",
+                "status": "completed",
+                "output": "CONFIRMED",
             },
         ]
         result = {"events": events, "spawn_events": events, "text": ""}
@@ -322,8 +341,25 @@ class E2EDispatchTests(unittest.TestCase):
             implementation["parent_integration_tools"],
             ["run_terminal_command"],
         )
+        self.assertEqual(implementation["result_ready_sequence"], 4)
+        with self.assertRaisesRegex(AssertionError, "before executor integration"):
+            runner.require_bound_verifier(
+                result,
+                after_role="executor",
+                after_sequence=implementation["result_ready_sequence"],
+                claim_terms=("client.py", "test_client.py"),
+            )
 
-        events[2]["raw_input"]["command"] = "git cherry-pick def5678"
+        events[2]["sequence"] = 5
+        verification = runner.require_bound_verifier(
+            result,
+            after_role="executor",
+            after_sequence=implementation["result_ready_sequence"],
+            claim_terms=("client.py", "test_client.py"),
+        )
+        self.assertEqual(verification["spawn_sequence"], 5)
+
+        events[3]["raw_input"]["command"] = "git cherry-pick def5678"
         with self.assertRaisesRegex(AssertionError, "parent session mutated"):
             runner.require_role_owned_implementation(result, "executor")
 
@@ -436,6 +472,28 @@ class E2EDispatchTests(unittest.TestCase):
                 "",
             )
             self.assertTrue(runner.assert_rename_behavior(fixture)["passed"])
+
+            (fixture / "auth.py").write_text(
+                "import hmac\n\n"
+                "def authenticate(api_key: str) -> bool:\n"
+                "    return hmac.compare_digest(b'legacy-test-key', api_key.encode())\n",
+                encoding="utf-8",
+            )
+            (fixture / "test_auth.py").write_text(
+                "import unittest\n\n"
+                "from auth import authenticate\n\n"
+                "class AuthTest(unittest.TestCase):\n"
+                "    def test_valid(self):\n"
+                "        self.assertTrue(authenticate('legacy-test-key'))\n\n"
+                "    def test_invalid(self):\n"
+                "        self.assertFalse(authenticate('wrong'))\n",
+                encoding="utf-8",
+            )
+            (fixture / "README.md").write_text(
+                "Authentication uses timing-safe compare_digest.\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(runner.assert_security_behavior(fixture)["passed"])
 
     def test_tool_failure_links_to_original_spawn_call(self) -> None:
         runner = load_runner_module()
@@ -628,9 +686,35 @@ class E2EDispatchTests(unittest.TestCase):
                 encoding="utf-8",
             )
             events = runner.parse_session_events(session)
+            events.append(
+                {
+                    "kind": "tool_call",
+                    "sequence": 0.5,
+                    "tool": "write",
+                    "read_only": False,
+                    "raw_input": {"file_path": str(session / "plan.md")},
+                }
+            )
             gate = runner.assert_native_plan_gate(
                 {"events": events, "session_dir": str(session)}
             )
+            events.append(
+                {
+                    "kind": "tool_call",
+                    "sequence": 0.75,
+                    "tool": "run_terminal_command",
+                    "read_only": False,
+                    "raw_input": {
+                        "command": "sed -i old new auth.py && git restore auth.py"
+                    },
+                }
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "mutation-capable tools before approval"
+            ):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
 
         self.assertTrue(gate["entered_first"])
         self.assertEqual(gate["verdicts"], ["REVISE", "READY"])
@@ -642,6 +726,7 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertTrue(gate["fresh_reverification_after_revise"])
         self.assertTrue(gate["ready_before_exit"])
         self.assertTrue(gate["awaiting_native_approval"])
+        self.assertEqual(gate["parent_mutation_tools"], [])
 
     def test_native_plan_gate_rejects_invalid_review_sequences(self) -> None:
         runner = load_runner_module()
@@ -892,6 +977,7 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertTrue(gate["awaiting_native_approval"])
         self.assertTrue(gate["git_clean_before_approval"])
         self.assertTrue(gate["source_unchanged_before_approval"])
+        self.assertEqual(gate["parent_mutation_tools"], [])
         self.assertEqual(gate["write_capable_spawns"], [])
         self.assertTrue(gate["security_review"]["finished_before_readiness"])
         self.assertTrue(gate["resumed_after_user_continuation"])
@@ -942,6 +1028,10 @@ class E2EDispatchTests(unittest.TestCase):
             )
             self.assertEqual(
                 case_gate["implementation"]["alternate_write_capable_spawns"], []
+            )
+            self.assertLess(
+                case_gate["implementation"]["result_ready_sequence"],
+                case_gate["verification"]["spawn_sequence"],
             )
             self.assertTrue(case_gate["verification"]["claim_terms"])
         self.assertTrue(payload["cue_free_gate"]["complete"])

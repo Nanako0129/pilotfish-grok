@@ -746,6 +746,7 @@ def require_role_owned_implementation(
     )
     parent_verification_tools = []
     parent_integration_tools = []
+    parent_integration_sequences = []
     parent_mutations = []
     for event in result["events"]:
         if (
@@ -768,6 +769,7 @@ def require_role_owned_implementation(
             implementation["finish_sequence"],
         ):
             parent_integration_tools.append(event.get("tool"))
+            parent_integration_sequences.append(event["sequence"])
             continue
         parent_mutations.append(event)
     if parent_mutations:
@@ -792,6 +794,9 @@ def require_role_owned_implementation(
     implementation["parent_mutation_tools"] = []
     implementation["parent_verification_tools"] = parent_verification_tools
     implementation["parent_integration_tools"] = parent_integration_tools
+    implementation["result_ready_sequence"] = max(
+        [implementation["finish_sequence"], *parent_integration_sequences]
+    )
     if exclusive:
         implementation["alternate_write_capable_spawns"] = []
     return implementation
@@ -855,11 +860,22 @@ def is_worktree_cherry_pick(
 
 
 def require_bound_verifier(
-    result: dict[str, Any], *, after_role: str, claim_terms: tuple[str, ...]
+    result: dict[str, Any],
+    *,
+    after_role: str,
+    after_sequence: int | None = None,
+    claim_terms: tuple[str, ...],
 ) -> dict[str, Any]:
     verification = require_completed_role(
         result, "verifier", after_role=after_role
     )
+    if (
+        after_sequence is not None
+        and verification["spawn_sequence"] <= after_sequence
+    ):
+        raise AssertionError(
+            "verifier started before executor integration completed"
+        )
     spawn = next(
         event
         for event in result["events"]
@@ -916,16 +932,9 @@ def cue_free_case_result(
 
 
 def is_confirmed(output: str) -> bool:
-    leading = re.match(
-        r"(?i)^\s*(?:#{1,6}\s*)?\*{0,2}(CONFIRMED|REFUTED)\b", output
-    )
-    verdicts = re.findall(
-        r"(?im)^\s*(?:#{1,6}\s*)?\*{0,2}(CONFIRMED|REFUTED)\b", output
-    )
     return (
-        leading is not None
-        and leading.group(1).upper() == "CONFIRMED"
-        and {verdict.upper() for verdict in verdicts} == {"CONFIRMED"}
+        re.match(r"(?i)^\s*CONFIRMED(?:\s|$)", output) is not None
+        and re.search(r"(?i)(?<![\w-])REFUTED(?![\w-])", output) is None
     )
 
 
@@ -1236,6 +1245,34 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
     plan_path = Path(result["session_dir"]) / "plan.md"
     if not plan_path.is_file() or not plan_path.read_text(encoding="utf-8").strip():
         raise AssertionError(f"native Plan file missing or empty: {plan_path}")
+    planning_mutations = []
+    for event in tool_calls:
+        if event["sequence"] >= exit_event["sequence"]:
+            continue
+        if event.get("read_only") is True or event.get("tool") in {
+            "enter_plan_mode",
+            "exit_plan_mode",
+            "spawn_subagent",
+        }:
+            continue
+        raw_input = event.get("raw_input")
+        target = (
+            raw_input.get("file_path") or raw_input.get("path")
+            if isinstance(raw_input, dict)
+            else None
+        )
+        if (
+            event.get("tool") in {"write", "write_file"}
+            and isinstance(target, str)
+            and Path(target).resolve() == plan_path.resolve()
+        ):
+            continue
+        planning_mutations.append(event)
+    if planning_mutations:
+        raise AssertionError(
+            "parent used mutation-capable tools before approval: "
+            f"{[(e['sequence'], e.get('tool')) for e in planning_mutations]!r}"
+        )
     plan_mode_path = Path(result["session_dir"]) / "plan_mode.json"
     if not plan_mode_path.is_file():
         raise AssertionError(f"native Plan state missing: {plan_mode_path}")
@@ -1276,6 +1313,7 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
         "ready_before_exit": True,
         "exit_sequence": exit_event["sequence"],
         "awaiting_native_approval": True,
+        "parent_mutation_tools": [],
         "write_capable_spawns": write_capable_spawns,
     }
 
@@ -1570,23 +1608,37 @@ def assert_security_behavior(fixture: Path) -> dict[str, Any]:
 import auth
 
 calls = []
-def spy(left, right):
-    calls.append((left, right))
-    return left == right
+def normalized(value):
+    if isinstance(value, bytes):
+        return value.decode()
+    if isinstance(value, str):
+        return value
+    raise AssertionError(f"unexpected compare_digest argument: {type(value)!r}")
 
 if hasattr(auth, "hmac"):
-    auth.hmac.compare_digest = spy
+    original = auth.hmac.compare_digest
 elif hasattr(auth, "compare_digest"):
-    auth.compare_digest = spy
+    original = auth.compare_digest
 else:
     raise AssertionError("compare_digest is not reachable from auth")
 
+def spy(left, right):
+    calls.append((normalized(left), normalized(right)))
+    return original(left, right)
+
+if hasattr(auth, "hmac"):
+    auth.hmac.compare_digest = spy
+else:
+    auth.compare_digest = spy
+
 assert auth.authenticate("legacy-test-key") is True
 assert auth.authenticate("wrong") is False
-assert calls == [
-    ("legacy-test-key", "legacy-test-key"),
-    ("wrong", "legacy-test-key"),
-]
+assert len(calls) == 2
+for actual, candidate in zip(calls, ("legacy-test-key", "wrong")):
+    assert actual in (
+        (candidate, "legacy-test-key"),
+        ("legacy-test-key", candidate),
+    )
 """,
     )
 
@@ -1605,6 +1657,7 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
     verification = require_bound_verifier(
         result,
         after_role="mech-executor",
+        after_sequence=implementation["result_ready_sequence"],
         claim_terms=(
             "validate_api_key",
             "auth.py",
@@ -1634,9 +1687,10 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
 def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
     prompt = (
         "Add bounded retry handling in client.py and cover it in test_client.py. "
-        "Export TransientError as the only retryable failure, preserve "
-        "Client(transport) and fetch(), and test transient success, exhaustion, "
-        "and immediate permanent failure."
+        "Export TransientError as the only retryable failure and preserve "
+        "Client(transport) and fetch(). Choose the attempt limit and failure "
+        "behavior, then test transient success, exhaustion, and immediate "
+        "permanent failure."
     )
     assert_cue_free_prompt(prompt)
     baseline_test = (fixture / "test_client.py").read_text(encoding="utf-8")
@@ -1647,6 +1701,7 @@ def case_cue_free_judgment(fixture: Path) -> dict[str, Any]:
     verification = require_bound_verifier(
         result,
         after_role="executor",
+        after_sequence=implementation["result_ready_sequence"],
         claim_terms=(
             "client.py",
             "test_client.py",
@@ -1709,6 +1764,7 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
     verification = require_bound_verifier(
         result,
         after_role="security-executor",
+        after_sequence=implementation["result_ready_sequence"],
         claim_terms=(
             "hmac.compare_digest",
             "auth.py",
