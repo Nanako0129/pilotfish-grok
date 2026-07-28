@@ -95,6 +95,53 @@ class E2EDispatchTests(unittest.TestCase):
                         "params": {
                             "update": {
                                 "sessionUpdate": "hook_execution",
+                                "source": {"plugin_name": "ponytail"},
+                                "runs": [{"name": "post-tool"}],
+                            }
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "executed 1 Claude startup/runtime hooks"
+            ):
+                runner.assert_session_claude_isolated(
+                    session, {"claude", "ponytail"}
+                )
+            (session / "updates.jsonl").write_text(
+                json.dumps(
+                    {
+                        "params": {
+                            "update": {
+                                "sessionUpdate": "hook_execution",
+                                "source": {"plugin_name": "native-tools"},
+                                "runs": [
+                                    {
+                                        "name": "post-tool",
+                                        "arguments": ["ponytail"],
+                                    }
+                                ],
+                            }
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            isolation = runner.assert_session_claude_isolated(
+                session, {"claude", "ponytail"}
+            )
+            self.assertEqual(isolation["claude_hook_execution_events"], 0)
+
+            (session / "chat_history.jsonl").write_text("{}\n", encoding="utf-8")
+            (session / "updates.jsonl").write_text(
+                json.dumps(
+                    {
+                        "params": {
+                            "update": {
+                                "sessionUpdate": "hook_execution",
                                 "runs": [{"name": "global/orca-status"}],
                             }
                         }
@@ -130,6 +177,67 @@ class E2EDispatchTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "Claude compatibility leaked"):
                 runner.assert_session_claude_isolated(session)
 
+    def test_claude_hook_path_identifiers_reach_session_gate(self) -> None:
+        runner = load_runner_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            (home / "config.toml").write_text("", encoding="utf-8")
+            inspected = {
+                "externalCompat": {
+                    "cells": [
+                        {"vendor": "claude", "surface": surface, "enabled": False}
+                        for surface in runner.CLAUDE_COMPAT_SURFACES
+                    ]
+                },
+                "hooks": [
+                    {
+                        "path": "/tmp/.claude/hooks/start.py",
+                        "disabled": True,
+                    }
+                ],
+            }
+            with (
+                mock.patch.dict(os.environ, {"GROK_HOME": str(home)}),
+                mock.patch.object(
+                    runner,
+                    "run_cmd",
+                    return_value=subprocess.CompletedProcess(
+                        ["grok", "inspect", "--json"],
+                        0,
+                        stdout=json.dumps(inspected),
+                        stderr="",
+                    ),
+                ),
+            ):
+                identifiers = set(
+                    runner.assert_claude_isolation_config()[
+                        "claude_runtime_identifiers"
+                    ]
+                )
+            self.assertIn("start", identifiers)
+
+            session = home / "session"
+            session.mkdir()
+            (session / "chat_history.jsonl").write_text("{}\n", encoding="utf-8")
+            (session / "updates.jsonl").write_text(
+                json.dumps(
+                    {
+                        "params": {
+                            "update": {
+                                "sessionUpdate": "hook_execution",
+                                "source": {"plugin_name": "start"},
+                            }
+                        }
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "executed 1 Claude startup/runtime hooks"
+            ):
+                runner.assert_session_claude_isolated(session, identifiers)
+
     def test_candidate_agent_surface_must_match_active_home(self) -> None:
         runner = load_runner_module()
         with tempfile.TemporaryDirectory() as tmp:
@@ -149,6 +257,10 @@ class E2EDispatchTests(unittest.TestCase):
                     evidence["candidate_surface"]["agents_match"],
                     runner.ROLES,
                 )
+                self.assertEqual(
+                    evidence["candidate_surface"]["agent_files"],
+                    sorted(f"{role}.md" for role in runner.ROLES),
+                )
                 verifier = home / "agents" / "verifier.md"
                 verifier.write_text(
                     verifier.read_text(encoding="utf-8") + "\nstale\n",
@@ -157,6 +269,14 @@ class E2EDispatchTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     AssertionError, "agent surface does not match"
                 ):
+                    runner.assert_install_surface()
+                shutil.copy2(ROOT / "templates" / "agents" / "verifier.md", verifier)
+                (home / "agents" / "extra.md").write_text("extra\n", encoding="utf-8")
+                (home / "roles" / "extra.toml").write_text(
+                    'default_capability_mode = "all"\n',
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(AssertionError, "filenames"):
                     runner.assert_install_surface()
 
     def test_cue_free_prompt_guard(self) -> None:
@@ -185,6 +305,8 @@ class E2EDispatchTests(unittest.TestCase):
             "CONFIRMED\nNo REFUTED verdict was applicable",
         ):
             self.assertFalse(runner.is_confirmed(verdict))
+        with self.assertRaisesRegex(AssertionError, "selection is empty"):
+            runner.selected_cases("")
 
     def test_executor_ownership_and_verifier_claim_are_enforced(self) -> None:
         runner = load_runner_module()
@@ -260,6 +382,505 @@ class E2EDispatchTests(unittest.TestCase):
             implementation["contract_terms"],
             ["SLICE-test", "client.py"],
         )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "Create evil.py after updating auth.py."
+        )
+        with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                ),
+            )
+        for suffix in (
+            "evil.sh.",
+            "EVIL.SH.",
+            "evil.execute.",
+            "evil..sh",
+            "evil...sh",
+            "dir/evil..sh",
+            ".env",
+            "..env",
+            ".config.json",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                f"Files: auth.py, test_auth.py, README.md, {suffix}"
+            )
+            with self.assertRaisesRegex(AssertionError, "scope"):
+                runner.require_bound_implementation(
+                    result,
+                    implementation,
+                    ("SLICE-test", "auth.py"),
+                    approved_files=("auth.py", "test_auth.py", "README.md"),
+                    repository_files=(
+                        "auth.py",
+                        "test_auth.py",
+                        "README.md",
+                    ),
+                )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test with `hmac.compare_digest` and "
+            "`inspect.getsource`.\n"
+            "Files: auth.py, test_auth.py, README.md"
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            (
+                "SLICE-test",
+                "auth.py",
+                "hmac.compare_digest",
+                "inspect.getsource",
+            ),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=("auth.py", "test_auth.py", "README.md"),
+            allowed_dotted_tokens=("hmac.compare_digest", "inspect.getsource"),
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test with `.config`.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "Use .config.json."
+        )
+        with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py", ".config"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=("auth.py", "test_auth.py", "README.md"),
+                allowed_dotted_tokens=(".config",),
+            )
+        for allowed, masked in (
+            ("evil.sh", "evil.sh."),
+            ("evil.sh", "evil.sh.."),
+            (".config", ".config."),
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                f"Implement approved SLICE-test with {masked}\n"
+                "Files: auth.py, test_auth.py, README.md"
+            )
+            with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+                runner.require_bound_implementation(
+                    result,
+                    implementation,
+                    ("SLICE-test", "auth.py", allowed),
+                    approved_files=("auth.py", "test_auth.py", "README.md"),
+                    repository_files=("auth.py", "test_auth.py", "README.md"),
+                    allowed_dotted_tokens=(allowed,),
+                )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test with .config\n"
+            "Files: auth.py, test_auth.py, README.md"
+        )
+        runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py", ".config"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=("auth.py", "test_auth.py", "README.md"),
+            allowed_dotted_tokens=(".config",),
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "### Non-goals\n"
+            "- Delete client.py."
+        )
+        with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "client.py",
+                ),
+            )
+        for directive in (
+            "Update client.py to keep callers aligned.",
+            "Add client.py to the compatibility surface.",
+            "Do not leave client.py unchanged; edit it.",
+            "Do not touch client.py and update evil.py.",
+            "Do not touch client.py, update it.",
+            "Do not touch client.py. Update it.",
+            "Do not touch client.py — update it.",
+            "Do not touch client.py while updating it.",
+            "Do not touch client.py except to update imports.",
+            "Do not touch client.py, remove hardcoded key, or add third-party "
+            "deps and update evil.py.",
+            "Secret relocation; client.py changes; update evil.py.",
+            "Secret relocation; client.py changes; updating evil.py.",
+            "Secret relocation; client.py changes; introduce evil.py.",
+            "Secret relocation; client.py changes; evil.py changes are required.",
+            "Secret relocation; client.py changes; overwrite evil.py.",
+            "Secret relocation; client.py changes; mutate evil.py.",
+            "Secret relocation; client.py changes; revise evil.py.",
+            "client.py changes; then update it.",
+            "client.py changes; it must be updated.",
+            "Create evil.sh after updating auth.py.",
+            "Create EVIL.SH after updating auth.py.",
+            "client.py changes\n  Update it to keep callers aligned.",
+            "- client.py\n  Update it to keep callers aligned.",
+            "- client.py\n\n  Update it to keep callers aligned.",
+            "- client.py\n  Update it to keep callers aligned.\n- client.py",
+            "packaging\n   ### Implementation\n- client.py",
+            "packaging\n# Implementation\n- client.py",
+            "packaging\n##### Implementation\n- client.py",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                "Files: auth.py, test_auth.py, README.md\n"
+                "### Non-goals\n"
+                f"- {directive}"
+            )
+            with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+                runner.require_bound_implementation(
+                    result,
+                    implementation,
+                    ("SLICE-test", "auth.py"),
+                    approved_files=("auth.py", "test_auth.py", "README.md"),
+                    repository_files=(
+                        "auth.py",
+                        "test_auth.py",
+                        "README.md",
+                        "client.py",
+                        "evil.py",
+                    ),
+                )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "### Exclusive ownership (only these files)\n"
+            "1. `auth.py`\n"
+            "2. `test_auth.py`\n"
+            "3. `README.md`\n"
+            "### Non-goals\n"
+            "Do not change client.py."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+            ),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "Do NOT modify `client.py`, `test_client.py`, or anything else.\n"
+            "### test_auth.py requirements\n"
+            "Path proof: use `unittest.mock`."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+                "test_client.py",
+            ),
+            allowed_dotted_tokens=("unittest.mock",),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        for escaped in (
+            "9. Do not change client.py / test_client.py and update evil.py.",
+            "Do not change client.py, test_client.py, or anything else except evil.py.",
+            "9. Do not change client.py / test_client.py.\n"
+            "   Update those files.",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                "Files: auth.py, test_auth.py, README.md\n"
+                f"{escaped}"
+            )
+            with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+                runner.require_bound_implementation(
+                    result,
+                    implementation,
+                    ("SLICE-test", "auth.py"),
+                    approved_files=("auth.py", "test_auth.py", "README.md"),
+                    repository_files=(
+                        "auth.py",
+                        "test_auth.py",
+                        "README.md",
+                        "client.py",
+                        "test_client.py",
+                        "evil.py",
+                    ),
+                )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "## Non-goals: auth.py, test_auth.py, README.md\n"
+            "- client.py"
+        )
+        with self.assertRaisesRegex(AssertionError, "omitted approved files"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                (
+                    "SLICE-test",
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                ),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "client.py",
+                ),
+            )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "### Files to change (exclusive ownership)\n"
+            "1. **auth.py** uses `hmac.compare_digest`.\n"
+            "2. **test_auth.py** adds a regression (e.g. empty input).\n"
+            "3. **README.md** documents the behavior.\n"
+            "### Out of scope\n"
+            "- client.py, test_client.py, secret_marker.txt"
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            (
+                "SLICE-test",
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "hmac.compare_digest",
+            ),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+                "test_client.py",
+                "secret_marker.txt",
+            ),
+            allowed_dotted_tokens=("hmac.compare_digest", "e.g."),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "### Exclusive file ownership\n"
+            "- auth.py\n"
+            "- test_auth.py\n"
+            "- README.md\n"
+            "### Do not touch\n"
+            "- client.py, test_client.py, secret_marker.txt\n"
+            "### Implementation requirements\n"
+            "return hmac.compare_digest(api_key.encode('utf-8'), _EXPECTED)\n"
+            "Patch `auth.hmac.compare_digest` with `unittest.mock.patch`."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py", "hmac.compare_digest"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+                "test_client.py",
+                "secret_marker.txt",
+            ),
+            allowed_dotted_tokens=(
+                "hmac.compare_digest",
+                "api_key.encode",
+                "auth.hmac.compare_digest",
+                "unittest.mock.patch",
+            ),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "### Do not touch and update\n"
+            "- client.py"
+        )
+        with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "client.py",
+                ),
+            )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "### Scope (exclusive — only these files)\n"
+            "1. **auth.py**\n"
+            "2. **test_auth.py**\n"
+            "3. **README.md**\n"
+            "### Non-goals\n"
+            "Do not touch client.py."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+            ),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "### Exclusive file ownership\n"
+            "- auth.py\n"
+            "- test_auth.py\n"
+            "- README.md\n"
+            "### Implementation\n"
+            "Use `hmac.compare_digest` (e.g. for a wrong-length key).\n"
+            "### Non-goals (do not do)\n"
+            "- client.py changes\n"
+            "- Timing benchmark tests\n"
+            "### Acceptance\n"
+            "Run python unittest."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            (
+                "SLICE-test",
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "hmac.compare_digest",
+            ),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+            ),
+            allowed_dotted_tokens=("hmac.compare_digest", "e.g."),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "**Files (exclusive ownership — only these):**\n"
+            "- `auth.py`\n"
+            "- `test_auth.py`\n"
+            "- `README.md`\n\n"
+            "**Constraints:**\n"
+            "Use `hmac.compare_digest`; path proof may use "
+            "`unittest.mock.patch` or `inspect.getsource` (e.g. a spy).\n"
+            "**Done criteria:** run python unittest.\n"
+            "### Non-goals\n"
+            "- client.py changes"
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            (
+                "SLICE-test",
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "hmac.compare_digest",
+            ),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+            ),
+            allowed_dotted_tokens=(
+                "hmac.compare_digest",
+                "inspect.getsource",
+                "unittest.mock.patch",
+                "e.g.",
+            ),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        for exclusion in (
+            "Do not touch client.py, secret storage, packaging, microbenchmarks.",
+            "Do not touch client.py, test_client.py, remove hardcoded key, "
+            "or add third-party deps.",
+            "Secret relocation; client.py/test_client.py changes; type-guard "
+            "for non-str; timing benchmarks; rate limiting.",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                "### Scope (exclusive — only these files)\n"
+                "1. **auth.py**\n"
+                "2. **test_auth.py**\n"
+                "3. **README.md**\n"
+                "### Non-goals\n"
+                f"{exclusion}"
+            )
+            implementation = runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "client.py",
+                ),
+            )
+            self.assertEqual(
+                implementation["approved_files"],
+                ["auth.py", "test_auth.py", "README.md"],
+            )
 
         events[2]["raw_input"]["command"] += " && sed -i old new client.py"
         with self.assertRaisesRegex(AssertionError, "parent session mutated"):
@@ -355,7 +976,57 @@ class E2EDispatchTests(unittest.TestCase):
                 after_sequence=0,
                 exclusive=True,
             )
-        events[0]["sequence"] = 4
+        events[0].update(
+            {
+                "subagent_type": "security-executor",
+                "capability_mode": "all",
+            }
+        )
+        with self.assertRaisesRegex(AssertionError, "exclusive write-capable"):
+            runner.require_role_owned_implementation(
+                result,
+                "security-executor",
+                after_sequence=0,
+                exclusive=True,
+            )
+        events[0].update(
+            {
+                "sequence": 4,
+                "subagent_type": "mech-executor",
+                "capability_mode": "execute",
+            }
+        )
+        with self.assertRaisesRegex(AssertionError, "exclusive write-capable"):
+            runner.require_role_owned_implementation(
+                result,
+                "security-executor",
+                after_sequence=0,
+                exclusive=True,
+            )
+        events[0].update(
+            {
+                "sequence": 4,
+                "subagent_type": "verifier",
+                "capability_mode": "execute",
+            }
+        )
+        events.append(
+            {
+                "kind": "spawned",
+                "sequence": 5,
+                "subagent_type": "verifier",
+                "capability_mode": "execute",
+                "subagent_id": "second-verifier",
+            }
+        )
+        with self.assertRaisesRegex(AssertionError, "exclusive write-capable"):
+            runner.require_role_owned_implementation(
+                result,
+                "security-executor",
+                after_sequence=0,
+                exclusive=True,
+            )
+        events.pop()
         implementation = runner.require_role_owned_implementation(
             result,
             "security-executor",
@@ -512,6 +1183,13 @@ class E2EDispatchTests(unittest.TestCase):
 
     def test_source_snapshot_ignores_git_index_hiding(self) -> None:
         runner = load_runner_module()
+        self.assertEqual(
+            runner.changed_source_paths(
+                {"auth.py": "old", "client.py": "same"},
+                {"auth.py": "new", "client.py": "same", "extra.py": "new"},
+            ),
+            ["auth.py", "extra.py"],
+        )
         with tempfile.TemporaryDirectory() as tmp:
             fixture = runner.make_fixture(Path(tmp))
             before = runner.source_snapshot(fixture)
@@ -526,6 +1204,32 @@ class E2EDispatchTests(unittest.TestCase):
             )
             self.assertEqual(runner.git_status(fixture), [])
             self.assertNotEqual(runner.source_snapshot(fixture), before)
+
+            client = fixture / "client.py"
+            original_mode = client.stat().st_mode
+            before_mode_change = runner.source_snapshot(fixture)
+            client.chmod(original_mode ^ 0o100)
+            self.assertEqual(
+                runner.changed_source_paths(
+                    before_mode_change,
+                    runner.source_snapshot(fixture),
+                ),
+                ["client.py"],
+            )
+            client.chmod(original_mode)
+
+            external = Path(tmp) / "external-client.py"
+            external.write_bytes(client.read_bytes())
+            before_type_change = runner.source_snapshot(fixture)
+            client.unlink()
+            client.symlink_to(external)
+            self.assertEqual(
+                runner.changed_source_paths(
+                    before_type_change,
+                    runner.source_snapshot(fixture),
+                ),
+                ["client.py"],
+            )
 
     def test_harness_owned_behavior_probes_reject_baseline_fixture(self) -> None:
         runner = load_runner_module()
@@ -646,6 +1350,11 @@ class E2EDispatchTests(unittest.TestCase):
                 "",
             )
             self.assertTrue(runner.assert_rename_behavior(fixture)["passed"])
+            stale = fixture / "compat.py"
+            stale.write_text("from auth import authenticate\n", encoding="utf-8")
+            with self.assertRaisesRegex(AssertionError, "left old symbols"):
+                runner.assert_rename_behavior(fixture)
+            stale.unlink()
 
             (fixture / "auth.py").write_text(
                 "import hmac\n\n"
@@ -1163,6 +1872,9 @@ class E2EDispatchTests(unittest.TestCase):
             runner.ROLES,
         )
         self.assertEqual(payload["claude_isolation"]["active_claude_entries"], 0)
+        self.assertIn(
+            "claude", payload["claude_isolation"]["claude_runtime_identifiers"]
+        )
         cases = {case["case"]: case for case in payload["cases"]}
         self.assertEqual(
             set(cases),
@@ -1187,6 +1899,10 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertTrue(gate["resumed_after_user_continuation"])
         self.assertEqual(
             gate["implementation"]["alternate_write_capable_spawns"], []
+        )
+        self.assertEqual(
+            gate["implementation"]["changed_files"],
+            ["README.md", "auth.py", "test_auth.py"],
         )
         for term in (
             "auth.py",

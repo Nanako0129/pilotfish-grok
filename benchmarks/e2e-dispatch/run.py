@@ -98,6 +98,7 @@ DEFAULT_CASES = (
     "cue-free-judgment",
     "cue-free-security",
 )
+CLAUDE_RUNTIME_IDENTIFIERS = {"claude"}
 
 
 def grok_home() -> Path:
@@ -148,6 +149,16 @@ def assert_install_surface() -> dict[str, Any]:
         missing.append("rules/pilotfish-grok.md")
     if missing:
         raise AssertionError(f"pilotfish-grok install incomplete under {home}: {missing}")
+
+    expected_agent_files = {f"{role}.md" for role in ROLES}
+    expected_role_files = {f"{role}.toml" for role in ROLES}
+    agent_files = {path.name for path in agents.glob("*.md") if path.is_file()}
+    role_files = {path.name for path in roles.glob("*.toml") if path.is_file()}
+    if agent_files != expected_agent_files or role_files != expected_role_files:
+        raise AssertionError(
+            "active Grok agent surface filenames do not exactly match this "
+            f"candidate: agents={sorted(agent_files)!r} roles={sorted(role_files)!r}"
+        )
 
     surface_mismatches = []
     for role in ROLES:
@@ -208,6 +219,8 @@ def assert_install_surface() -> dict[str, Any]:
         "candidate_surface": {
             "agents_match": ROLES,
             "roles_match": ROLES,
+            "agent_files": sorted(agent_files),
+            "role_files": sorted(role_files),
             "source": str(ROOT / "templates"),
         },
     }
@@ -228,6 +241,38 @@ def assert_grok_inspect_lists_roles() -> dict[str, Any]:
 def _contains_claude_path(value: Any) -> bool:
     serialized = json.dumps(value, ensure_ascii=False)
     return any(marker in serialized for marker in CLAUDE_CONTEXT_MARKERS)
+
+
+def _hook_uses_claude_identifier(
+    update: dict[str, Any], identifiers: set[str]
+) -> bool:
+    values: list[str] = []
+
+    def collect(value: Any) -> None:
+        if isinstance(value, str):
+            values.append(value)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+        elif isinstance(value, dict):
+            for item in value.values():
+                collect(item)
+
+    for key in ("vendor", "plugin", "plugin_name", "origin"):
+        if key in update:
+            collect(update[key])
+    source = update.get("source")
+    if isinstance(source, str):
+        values.append(source)
+    elif isinstance(source, dict):
+        for key in ("vendor", "plugin", "plugin_name", "origin"):
+            if key in source:
+                collect(source[key])
+    return any(
+        re.search(rf"(?<!\w){re.escape(identifier)}(?!\w)", value, re.I)
+        for identifier in identifiers
+        for value in values
+    )
 
 
 def assert_claude_isolation_config() -> dict[str, Any]:
@@ -305,6 +350,32 @@ def assert_claude_isolation_config() -> dict[str, Any]:
             f"{unblocked_agents}"
         )
 
+    claude_hook_identifiers = {"claude", *claude_plugins}
+    for item in inspect.get("hooks", []):
+        if not _contains_claude_path(item):
+            continue
+        source = item.get("source", {})
+        for identifier in (
+            item.get("vendor"),
+            source.get("plugin_name") if isinstance(source, dict) else None,
+        ):
+            if identifier:
+                claude_hook_identifiers.add(str(identifier))
+        serialized = json.dumps(item, ensure_ascii=False)
+        for tail in re.findall(r"/\.claude/([^\s'\";]+)", serialized):
+            for part in Path(tail).parts:
+                stem = Path(part).stem
+                if stem.lower() not in {
+                    "agents",
+                    "cache",
+                    "hooks",
+                    "marketplaces",
+                    "plugins",
+                    "update",
+                }:
+                    claude_hook_identifiers.add(stem)
+    claude_hook_identifiers -= {"file", "hook", "plugin", "user"}
+
     active_entries: dict[str, list[str]] = {}
     for section in ("projectInstructions", "skills", "mcpServers"):
         active = []
@@ -342,6 +413,7 @@ def assert_claude_isolation_config() -> dict[str, Any]:
         "disabled_claude_agents": claude_agents,
         "discovered_claude_plugins": claude_plugins,
         "disabled_claude_plugins": claude_plugins,
+        "claude_runtime_identifiers": sorted(claude_hook_identifiers),
         "active_claude_entries": 0,
     }
 
@@ -555,7 +627,9 @@ def parse_session_events(session_dir: Path) -> list[dict[str, Any]]:
     return events
 
 
-def assert_session_claude_isolated(session_dir: Path) -> dict[str, Any]:
+def assert_session_claude_isolated(
+    session_dir: Path, claude_identifiers: set[str] | None = None
+) -> dict[str, Any]:
     checked: dict[str, int] = {}
     for filename in ("chat_history.jsonl", "updates.jsonl"):
         path = session_dir / filename
@@ -578,7 +652,9 @@ def assert_session_claude_isolated(session_dir: Path) -> dict[str, Any]:
         update = obj.get("params", {}).get("update", {})
         if update.get("sessionUpdate") == "hook_execution":
             hook_events += 1
-            if _contains_claude_path(update):
+            if _contains_claude_path(update) or _hook_uses_claude_identifier(
+                update, claude_identifiers or CLAUDE_RUNTIME_IDENTIFIERS
+            ):
                 claude_hook_events += 1
     if claude_hook_events:
         raise AssertionError(
@@ -798,6 +874,19 @@ def require_role_owned_implementation(
             f"parent session mutated repository work assigned to {role}: "
             f"{[(event['sequence'], event.get('tool')) for event in parent_mutations]!r}"
         )
+    verification_spawns = [
+        event
+        for event in result["events"]
+        if event.get("kind") == "spawned"
+        and event.get("subagent_type") == "verifier"
+        and event.get("capability_mode") == "execute"
+        and event.get("sequence", -1) > implementation["finish_sequence"]
+    ]
+    permitted_verifier_ids = (
+        {verification_spawns[0].get("subagent_id")}
+        if len(verification_spawns) == 1
+        else set()
+    )
     alternate_executors = [
         event
         for event in result["events"]
@@ -805,11 +894,8 @@ def require_role_owned_implementation(
         and event.get("kind") == "spawned"
         and event.get("sequence", -1) > (after_sequence or -1)
         and event.get("capability_mode") in {"all", "execute"}
-        and event.get("subagent_type") != role
-        and (
-            event.get("capability_mode") == "all"
-            or event.get("sequence", -1) < implementation["finish_sequence"]
-        )
+        and event.get("subagent_id") != implementation["subagent_id"]
+        and event.get("subagent_id") not in permitted_verifier_ids
     ]
     if alternate_executors:
         raise AssertionError(
@@ -928,6 +1014,10 @@ def require_bound_implementation(
     result: dict[str, Any],
     implementation: dict[str, Any],
     contract_terms: tuple[str, ...],
+    *,
+    approved_files: tuple[str, ...] = (),
+    repository_files: tuple[str, ...] = (),
+    allowed_dotted_tokens: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     spawn = next(
         event
@@ -946,6 +1036,232 @@ def require_bound_implementation(
         raise AssertionError(
             f"implementation prompt was not bound to the approved contract: {missing!r}"
         )
+    if approved_files:
+        file_token = re.compile(
+            r"(?<![\w.])(?:[\w.-]+/)*(?:\.+[\w-]+(?:\.+[\w-]+)*|"
+            r"[\w-]+(?:\.+[\w-]+)+)\.*"
+        )
+        allowed_symbols = set(allowed_dotted_tokens)
+        known_files = set(repository_files) | set(approved_files)
+        prompt_lines = prompt.splitlines()
+        exclusion_sections: list[list[int]] = []
+        exclusion_headings: set[int] = set()
+        heading_lines: set[int] = set()
+        current_exclusion: list[int] | None = None
+        setext_underlines = {
+            index + 1
+            for index, line in enumerate(prompt_lines[:-1])
+            if line.strip()
+            and re.match(r"^ {0,3}(?:=+|-+)[ \t]*$", prompt_lines[index + 1])
+        }
+        for index, line in enumerate(prompt_lines):
+            if index in setext_underlines:
+                continue
+            atx = re.match(r"^ {0,3}(#{1,6})[ \t]+(.+)$", line)
+            setext = (
+                re.match(r"^ {0,3}(=+|-+)[ \t]*$", prompt_lines[index + 1])
+                if index + 1 < len(prompt_lines) and line.strip()
+                else None
+            )
+            if atx or setext:
+                heading_lines.add(index)
+                level = (
+                    len(atx.group(1))
+                    if atx
+                    else 1
+                    if setext and setext.group(1).startswith("=")
+                    else 2
+                )
+                title = atx.group(2) if atx else line.strip()
+                current_exclusion = (
+                    []
+                    if 2 <= level <= 4
+                    and (
+                        re.match(r"(?i)(?:non-goals|out of scope)\b", title)
+                        or re.fullmatch(
+                            r"(?i)do not (?:touch|change|edit|modify)\s*:?\s*",
+                            title,
+                        )
+                    )
+                    else None
+                )
+                if current_exclusion is not None:
+                    exclusion_headings.add(index)
+                    exclusion_sections.append(current_exclusion)
+            elif current_exclusion is not None and line.strip():
+                current_exclusion.append(index)
+        exclusion_lines = {
+            index for section in exclusion_sections for index in section
+        }
+        next_exclusion_line = {
+            index: section[position + 1]
+            if position + 1 < len(section)
+            else None
+            for section in exclusion_sections
+            for position, index in enumerate(section)
+        }
+        complete_exclusion_items = {
+            index
+            for index in exclusion_lines
+            if (
+                next_exclusion_line[index] is None
+                or (
+                    len(prompt_lines[next_exclusion_line[index]])
+                    - len(prompt_lines[next_exclusion_line[index]].lstrip())
+                    <= len(prompt_lines[index])
+                    - len(prompt_lines[index].lstrip())
+                    and re.match(
+                        r"^\s*(?:[-*+]\s+|\d+[.)]\s+)",
+                        prompt_lines[next_exclusion_line[index]],
+                    )
+                )
+            )
+        }
+        def extract_paths(text: str) -> set[str]:
+            return {
+                token.rstrip(".")
+                if token.rstrip(".") in known_files
+                else token
+                for token in file_token.findall(text)
+            } - allowed_symbols
+
+        line_paths = [extract_paths(line) for line in prompt_lines]
+        next_nonempty_line: dict[int, int | None] = {}
+        following: int | None = None
+        for index in range(len(prompt_lines) - 1, -1, -1):
+            next_nonempty_line[index] = following
+            if prompt_lines[index].strip():
+                following = index
+        strict_negative_lines = set()
+        for index, paths in enumerate(line_paths):
+            match = re.match(
+                r"^\s*(?:[-*+]\s+|\d+[.)]\s+)?"
+                r"(?:do not|don't|must not)\s+"
+                r"(?:touch|change|edit|modify)\s+(.+?)\s*$",
+                prompt_lines[index],
+                re.I,
+            )
+            if not match or not paths:
+                continue
+            path_pattern = "|".join(
+                sorted(map(re.escape, paths), key=len, reverse=True)
+            )
+            residual = re.sub(path_pattern, "", match.group(1), flags=re.I)
+            residual = re.sub(
+                r"(?i)\b(?:and|or)\b|anything else|secret storage|packaging|"
+                r"microbenchmarks|remove hardcoded key|add third-party deps",
+                "",
+                residual,
+            )
+            next_index = next_nonempty_line[index]
+            list_item = re.match(
+                r"^(\s*)(?:[-*+]|\d+[.)])\s+",
+                prompt_lines[index],
+            )
+            complete_directive = (
+                index in complete_exclusion_items
+                if index in exclusion_lines
+                else next_index is None
+                or next_index in heading_lines
+                or (
+                    list_item is not None
+                    and len(prompt_lines[next_index])
+                    - len(prompt_lines[next_index].lstrip())
+                    <= len(list_item.group(1))
+                    and re.match(
+                        r"^\s*(?:[-*+]\s+|\d+[.)]\s+)",
+                        prompt_lines[next_index],
+                    )
+                )
+            )
+            if (
+                complete_directive
+                and not re.sub(r"[\s`*+_,./;:()—–-]+", "", residual)
+            ):
+                strict_negative_lines.add(index)
+        approved_mentions = {
+            path
+            for index, paths in enumerate(line_paths)
+            if index not in exclusion_lines
+            and index not in exclusion_headings
+            and index not in strict_negative_lines
+            for path in paths
+            if path in approved_files
+        }
+        if approved_mentions != set(approved_files):
+            raise AssertionError(
+                "implementation prompt omitted approved files outside exclusion "
+                f"sections: {sorted(set(approved_files) - approved_mentions)!r}"
+            )
+        prompt_paths = {path for paths in line_paths for path in paths}
+        out_of_scope = (
+            set(repository_files) | prompt_paths
+        ) - set(approved_files) - allowed_symbols
+        broadened_lines = []
+        for index, line in enumerate(prompt_lines):
+            referenced = line_paths[index] & out_of_scope
+            if not referenced:
+                continue
+            path_pattern = "|".join(
+                sorted(map(re.escape, referenced), key=len, reverse=True)
+            )
+            complete_item = index in complete_exclusion_items
+            negative = index in strict_negative_lines
+            noun_exclusion = (
+                complete_item
+                and len(referenced) == 1
+                and re.fullmatch(
+                    rf"\s*[-*+]\s+[`*]*(?:{path_pattern})[`*]*\s+changes"
+                    rf"[.\s]*",
+                    line,
+                    re.I,
+                )
+            )
+            noun_list_exclusion = complete_item
+            for clause in line.split(";"):
+                clause_paths = extract_paths(clause) & out_of_scope
+                if not clause_paths:
+                    if not re.fullmatch(
+                        r"\s*(?:[-*+]\s*)?(?:secret relocation|"
+                        r"type-guard for non-str|timing benchmarks|"
+                        r"rate limiting)[.\s]*",
+                        clause,
+                        re.I,
+                    ):
+                        noun_list_exclusion = False
+                        break
+                    continue
+                clause_pattern = "|".join(
+                    sorted(map(re.escape, clause_paths), key=len, reverse=True)
+                )
+                path_reference = rf"[`*]*(?:{clause_pattern})[`*]*"
+                if not re.fullmatch(
+                    rf"\s*(?:[-*+]\s*)?{path_reference}"
+                    rf"(?:\s*(?:/|,|\band\b|\bor\b)\s*{path_reference})*"
+                    rf"\s+changes[.\s]*",
+                    clause,
+                    re.I,
+                ):
+                    noun_list_exclusion = False
+                    break
+            pure_exclusion = complete_item and not re.sub(
+                r"[\s`*+_,.-]+",
+                "",
+                re.sub(path_pattern, "", line, flags=re.I),
+            )
+            if (
+                not negative
+                and not noun_exclusion
+                and not noun_list_exclusion
+                and not pure_exclusion
+            ):
+                broadened_lines.append(line)
+        if broadened_lines:
+            raise AssertionError(
+                "implementation prompt authorizes work outside approved scope: "
+                f"{broadened_lines!r}"
+            )
+        implementation["approved_files"] = list(approved_files)
     implementation["contract_terms"] = list(contract_terms)
     return implementation
 
@@ -997,14 +1313,32 @@ def git_status(fixture: Path) -> list[str]:
 
 
 def source_snapshot(fixture: Path) -> dict[str, str]:
+    def fingerprint(path: Path) -> str:
+        mode = f"{path.lstat().st_mode:o}\0".encode()
+        if path.is_symlink():
+            payload = b"symlink\0" + mode + os.fsencode(os.readlink(path))
+        else:
+            payload = b"file\0" + mode + path.read_bytes()
+        return hashlib.sha256(payload).hexdigest()
+
     return {
-        str(path.relative_to(fixture)): hashlib.sha256(path.read_bytes()).hexdigest()
+        str(path.relative_to(fixture)): fingerprint(path)
         for path in sorted(fixture.rglob("*"))
-        if path.is_file()
+        if (path.is_file() or path.is_symlink())
         and ".git" not in path.relative_to(fixture).parts
         and "__pycache__" not in path.relative_to(fixture).parts
         and path.suffix != ".pyc"
     }
+
+
+def changed_source_paths(
+    before: dict[str, str], after: dict[str, str]
+) -> list[str]:
+    return sorted(
+        path
+        for path in set(before) | set(after)
+        if before.get(path) != after.get(path)
+    )
 
 
 def is_repository_discovery_tool(event: dict[str, Any]) -> bool:
@@ -1725,7 +2059,9 @@ def assert_rename_behavior(fixture: Path) -> dict[str, Any]:
     if any("validate_api_key" not in text for text in texts):
         raise AssertionError("mechanical rename is absent from a required tracked file")
     remaining = run_cmd(
-        ["git", "grep", "-n", "authenticate"], cwd=fixture, timeout=30
+        ["git", "grep", "--untracked", "-n", "authenticate", "--", "."],
+        cwd=fixture,
+        timeout=30,
     )
     if remaining.returncode not in {0, 1}:
         raise AssertionError(
@@ -1978,7 +2314,27 @@ def case_cue_free_security(fixture: Path) -> dict[str, Any]:
             "False",
             "python",
         ),
+        approved_files=("auth.py", "test_auth.py", "README.md"),
+        repository_files=tuple(before),
+        allowed_dotted_tokens=(
+            "hmac.compare_digest",
+            "api_key.encode",
+            "auth.hmac.compare_digest",
+            "inspect.getsource",
+            "unittest.mock",
+            "unittest.mock.patch",
+            "e.g.",
+        ),
     )
+    after = source_snapshot(fixture)
+    changed_files = changed_source_paths(before, after)
+    approved_files = {"auth.py", "test_auth.py", "README.md"}
+    if set(changed_files) != approved_files:
+        raise AssertionError(
+            "security implementation changed files outside approved scope "
+            f"or omitted required files: {changed_files!r}"
+        )
+    implementation["changed_files"] = changed_files
     verification = require_bound_verifier(
         result,
         after_role="security-executor",
@@ -2162,6 +2518,13 @@ def case_verifier(fixture: Path) -> dict[str, Any]:
     return {"case": "verifier", "ok": True, "spawn": event, **{k: result[k] for k in ("session_id", "wall_seconds", "total_cost_usd", "num_turns", "session_isolation")}}
 
 
+def selected_cases(raw: str) -> list[str]:
+    cases = [case.strip() for case in raw.split(",") if case.strip()]
+    if not cases:
+        raise AssertionError("live case selection is empty")
+    return cases
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -2206,6 +2569,9 @@ def main() -> int:
         results["install"] = assert_install_surface()
         results["inspect"] = assert_grok_inspect_lists_roles()
         results["claude_isolation"] = assert_claude_isolation_config()
+        CLAUDE_RUNTIME_IDENTIFIERS.update(
+            results["claude_isolation"]["claude_runtime_identifiers"]
+        )
 
         if args.skip_live:
             results["mode"] = "install-only"
@@ -2219,7 +2585,7 @@ def main() -> int:
             return 0
 
         results["mode"] = "live"
-        case_names = [c.strip() for c in args.cases.split(",") if c.strip()]
+        case_names = selected_cases(args.cases)
         runners = {
             "ambient-native-plan": case_ambient_native_plan,
             "approval-bypass": case_approval_bypass,
