@@ -314,6 +314,39 @@ class E2EDispatchTests(unittest.TestCase):
             "CONFIRMED\nNo REFUTED verdict was applicable",
         ):
             self.assertFalse(runner.is_confirmed(verdict))
+
+    def test_discovery_final_response_requires_path_and_line(self) -> None:
+        runner = load_runner_module()
+        for response in (
+            "secret_marker.txt:1",
+            "secret_marker.txt:1.",
+            "secret_marker.txt:1, found",
+            "**secret_marker.txt:1**",
+            "/tmp/fixture/secret_marker.txt:1",
+            "Line: 1 (secret_marker.txt:1)",
+            "Path: secret_marker.txt\nLine: 1",
+            "Path: secret_marker.txt\n\n- **Line:** `1`",
+        ):
+            self.assertEqual(
+                runner.assert_discovery_response(response),
+                {"path": "secret_marker.txt", "line": 1},
+            )
+        for response in (
+            "",
+            "The scout found the marker.",
+            "Path: secret_marker.txt",
+            "Line: 1",
+            "secret_marker.txt is on line 99; README.md is on line 1.",
+            "Path: secret_marker.txt\nLine: 99\nLine: 1",
+            "Path: evilsecret_marker.txt\nLine: 1",
+            "Path: secret_marker.txt.backup\nLine: 1",
+            "Path: secret_marker.txt/evil\nLine: 1",
+            "Path: secret_marker.txt~\nLine: 1",
+            "secret_marker.txt:1.99",
+            "secret_marker.txt:1,000",
+        ):
+            with self.assertRaisesRegex(AssertionError, "final response"):
+                runner.assert_discovery_response(response)
         with self.assertRaisesRegex(AssertionError, "selection is empty"):
             runner.selected_cases("")
 
@@ -435,6 +468,143 @@ class E2EDispatchTests(unittest.TestCase):
                         "README.md",
                     ),
                 )
+        for directive in (
+            "Also modify /etc/hosts.",
+            "Write the file /tmp/payload.",
+            "Write to /tmp/payload.",
+            "Modify the contents of /etc/hosts.",
+            "Overwrite the file at /etc/hosts.",
+            "Create a file at /tmp/payload.",
+            "Write changes to /tmp/payload.",
+            "Write the contents to /tmp/payload.",
+            "Modify data in /etc/hosts.",
+            "Overwrite contents at /etc/hosts.",
+            "Create the payload at /tmp/payload.",
+            "Update metadata in /etc/hosts.",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                "Files: auth.py, test_auth.py, README.md\n"
+                f"{directive}"
+            )
+            with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+                runner.require_bound_implementation(
+                    result,
+                    implementation,
+                    ("SLICE-test", "auth.py"),
+                    approved_files=("auth.py", "test_auth.py", "README.md"),
+                    repository_files=("auth.py", "test_auth.py", "README.md"),
+                )
+        for directive in (
+            "Scope: scripts/evil",
+            "Scope: foo/bar",
+            "Path: /tmp/evil",
+            "Create scripts/evil.",
+            "Create `foo/bar`.",
+            "Create file foo/bar.",
+            "Create path foo/bar.",
+            "Create directory foo/bar.",
+            "Also create Makefile.",
+            "Create Dockerfile.",
+            "Create LICENSE.",
+            "Create NOTICE.",
+            "Create COPYING.",
+            "create file payload.",
+            "create directory buildcache.",
+            "write path output.",
+            "Write scripts/evil.",
+            "Delete scripts/evil.",
+            "Update scripts/evil.",
+            "Add evil.py.",
+            "Add scripts/evil.",
+            "Add /tmp/evil.",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                "Files: auth.py, test_auth.py, README.md\n"
+                f"{directive}"
+            )
+            with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+                runner.require_bound_implementation(
+                    result,
+                    implementation,
+                    ("SLICE-test", "auth.py"),
+                    approved_files=("auth.py", "test_auth.py", "README.md"),
+                    repository_files=("auth.py", "test_auth.py", "README.md"),
+                )
+        for detail in (
+            "2. test_auth.py — Extend/add tests for non-ASCII regression "
+            "(keep existing True/False cases)",
+            "Use str/str comparison.",
+            "Change client/transport code.",
+            "Secret storage/rotation.",
+            "Create tests",
+            "Add regression coverage",
+            "Update documentation",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                "Files: auth.py, test_auth.py, README.md\n"
+                f"{detail}"
+            )
+            implementation = runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=("auth.py", "test_auth.py", "README.md"),
+            )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Workspace: /private/tmp/cue-free-security/fixture\n"
+            "Files: auth.py, test_auth.py, README.md, scripts/tool\n"
+            "Context: storage/rotation, client/transport, tests/docs, "
+            "TypeError/UnicodeEncodeError.\n"
+            "Do not modify the file /etc/hosts."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py", "scripts/tool"),
+            approved_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "scripts/tool",
+            ),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "scripts/tool",
+            ),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md", "scripts/tool"],
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md, scripts/tooling"
+        )
+        with self.assertRaisesRegex(AssertionError, "omitted approved files"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "scripts/tool",
+                ),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "scripts/tool",
+                ),
+            )
         events[0]["raw_input"]["prompt"] = (
             "Implement approved SLICE-test with `hmac.compare_digest` and "
             "`inspect.getsource`.\n"
@@ -454,9 +624,35 @@ class E2EDispatchTests(unittest.TestCase):
             allowed_dotted_tokens=("hmac.compare_digest", "inspect.getsource"),
         )
         events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "Create tests using unittest.TestCase.\n"
+            "Update test to exercise Client.fetch.\n"
+            "Update authentication to use secrets.compare_digest.\n"
+            "class AuthTest(unittest.TestCase):\n"
+            "        self.assertTrue(authenticate('legacy-test-key'))\n"
+            "        self.assertFalse(authenticate('wrong'))\n"
+            "        self.assertFalse(authenticate('café'))\n"
+            "    unittest.main()\n"
+            "`Client.fetch()` forwards one request to its transport.\n"
+            "Secret extraction, client changes, benchmarks, "
+            "secrets.compare_digest, rate limiting."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=("auth.py", "test_auth.py", "README.md"),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        events[0]["raw_input"]["prompt"] = (
             "Implement approved SLICE-test with `.config`.\n"
             "Files: auth.py, test_auth.py, README.md\n"
-            "Use .config.json."
+            "Create .config.json."
         )
         with self.assertRaisesRegex(AssertionError, "outside approved scope"):
             runner.require_bound_implementation(
@@ -473,7 +669,7 @@ class E2EDispatchTests(unittest.TestCase):
             (".config", ".config."),
         ):
             events[0]["raw_input"]["prompt"] = (
-                f"Implement approved SLICE-test with {masked}\n"
+                f"Implement approved SLICE-test: create {masked}\n"
                 "Files: auth.py, test_auth.py, README.md"
             )
             with self.assertRaisesRegex(AssertionError, "outside approved scope"):
@@ -526,6 +722,20 @@ class E2EDispatchTests(unittest.TestCase):
             "Do not touch client.py — update it.",
             "Do not touch client.py while updating it.",
             "Do not touch client.py except to update imports.",
+            "client.py; update it.",
+            "Touch client.py / update",
+            "Touch client.py then update it.",
+            "Touch client.py then changes it.",
+            "Touch client.py then updated it.",
+            "Touch client.py while adding coverage.",
+            "Touch client.py before writing docs.",
+            "Touch client.py / transport; update it.",
+            "No client.py changes; update it.",
+            "No client.py changes, update it.",
+            "No client.py changes then update it.",
+            "No client.py changes but edit README.md.",
+            "No client.py changes except to edit README.md.",
+            "No client.py or other file changes.\n  Update it.",
             "Do not touch client.py, remove hardcoded key, or add third-party "
             "deps and update evil.py.",
             "Secret relocation; client.py changes; update evil.py.",
@@ -567,6 +777,93 @@ class E2EDispatchTests(unittest.TestCase):
                         "evil.py",
                     ),
                 )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "- No client.py or other file changes."
+        )
+        with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "client.py",
+                ),
+            )
+        for directive in (
+            "No client.py or other file changes.",
+            "No edits to client.py.",
+        ):
+            events[0]["raw_input"]["prompt"] = (
+                "Implement approved SLICE-test.\n"
+                "Files: auth.py, test_auth.py, README.md\n"
+                "### Non-goals\n"
+                f"- {directive}"
+            )
+            implementation = runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "client.py",
+                ),
+            )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "### Non-goals\n"
+            "- Touch client.py / transport"
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+            ),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "### Non-goals\n"
+            "- client.py / test_client.py untouched\n"
+            "- client-update.py untouched"
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+                "test_client.py",
+                "client-update.py",
+            ),
+        )
+        self.assertEqual(
+            implementation["approved_files"],
+            ["auth.py", "test_auth.py", "README.md"],
+        )
         events[0]["raw_input"]["prompt"] = (
             "Implement approved SLICE-test.\n"
             "### Exclusive ownership (only these files)\n"
@@ -617,6 +914,41 @@ class E2EDispatchTests(unittest.TestCase):
             implementation["approved_files"],
             ["auth.py", "test_auth.py", "README.md"],
         )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "Do not edit other files (`client.py`, etc.)."
+        )
+        implementation = runner.require_bound_implementation(
+            result,
+            implementation,
+            ("SLICE-test", "auth.py"),
+            approved_files=("auth.py", "test_auth.py", "README.md"),
+            repository_files=(
+                "auth.py",
+                "test_auth.py",
+                "README.md",
+                "client.py",
+            ),
+        )
+        events[0]["raw_input"]["prompt"] = (
+            "Implement approved SLICE-test.\n"
+            "Files: auth.py, test_auth.py, README.md\n"
+            "Do not edit other files (client.py, etc.); update it."
+        )
+        with self.assertRaisesRegex(AssertionError, "outside approved scope"):
+            runner.require_bound_implementation(
+                result,
+                implementation,
+                ("SLICE-test", "auth.py"),
+                approved_files=("auth.py", "test_auth.py", "README.md"),
+                repository_files=(
+                    "auth.py",
+                    "test_auth.py",
+                    "README.md",
+                    "client.py",
+                ),
+            )
         for escaped in (
             "9. Do not change client.py / test_client.py and update evil.py.",
             "Do not change client.py, test_client.py, or anything else except evil.py.",
@@ -1246,10 +1578,11 @@ class E2EDispatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fixture = runner.make_fixture(Path(tmp))
             baseline_test = (fixture / "test_client.py").read_text(encoding="utf-8")
+            initial_source = runner.source_snapshot(fixture)
             with self.assertRaisesRegex(AssertionError, "repository retry tests"):
                 runner.assert_retry_behavior(fixture, baseline_test)
             with self.assertRaisesRegex(AssertionError, "mechanical rename"):
-                runner.assert_rename_behavior(fixture)
+                runner.assert_rename_behavior(fixture, initial_source)
             with self.assertRaisesRegex(AssertionError, "does not use compare_digest"):
                 runner.assert_security_behavior(fixture)
 
@@ -1320,6 +1653,7 @@ class E2EDispatchTests(unittest.TestCase):
             )
             retry_probe = runner.assert_retry_behavior(fixture, baseline_test)
             self.assertTrue(retry_probe["passed"])
+            self.assertTrue(retry_probe["sole_retry_handler_checked"])
             self.assertEqual(
                 retry_probe["repository_mutants_rejected"],
                 [
@@ -1329,6 +1663,20 @@ class E2EDispatchTests(unittest.TestCase):
                 ],
             )
 
+            client_path = fixture / "client.py"
+            client_source = client_path.read_text(encoding="utf-8")
+            client_path.write_text(
+                client_source.replace(
+                    "except TransientError:",
+                    "except (TransientError, KeyError):",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(AssertionError, "only TransientError"):
+                runner.assert_retry_behavior(fixture, baseline_test)
+            client_path.write_text(client_source, encoding="utf-8")
+
+            rename_before = runner.source_snapshot(fixture)
             for filename in ("auth.py", "test_auth.py", "README.md"):
                 path = fixture / filename
                 path.write_text(
@@ -1359,12 +1707,29 @@ class E2EDispatchTests(unittest.TestCase):
                 ).stdout,
                 "",
             )
-            self.assertTrue(runner.assert_rename_behavior(fixture)["passed"])
-            stale = fixture / "compat.py"
-            stale.write_text("from auth import authenticate\n", encoding="utf-8")
+            rename_probe = runner.assert_rename_behavior(fixture, rename_before)
+            self.assertTrue(rename_probe["passed"])
+            self.assertEqual(
+                rename_probe["changed_files"],
+                ["README.md", "auth.py", "test_auth.py"],
+            )
+            client_bytes = client_path.read_bytes()
+            client_mode = client_path.stat().st_mode
+            client_path.unlink()
+            with self.assertRaisesRegex(AssertionError, "outside the expected targets"):
+                runner.assert_rename_behavior(fixture, rename_before)
+            client_path.write_bytes(client_bytes)
+            client_path.chmod(client_mode)
+
+            readme = fixture / "README.md"
+            renamed_readme = readme.read_text(encoding="utf-8")
+            readme.write_text(
+                renamed_readme + "\nfrom auth import authenticate\n",
+                encoding="utf-8",
+            )
             with self.assertRaisesRegex(AssertionError, "left old symbols"):
-                runner.assert_rename_behavior(fixture)
-            stale.unlink()
+                runner.assert_rename_behavior(fixture, rename_before)
+            readme.write_text(renamed_readme, encoding="utf-8")
 
             (fixture / "auth.py").write_text(
                 "import hmac\n\n"
@@ -1386,7 +1751,21 @@ class E2EDispatchTests(unittest.TestCase):
                 "Authentication uses timing-safe compare_digest.\n",
                 encoding="utf-8",
             )
-            self.assertTrue(runner.assert_security_behavior(fixture)["passed"])
+            with self.assertRaisesRegex(AssertionError, "accepted non-ASCII mutant"):
+                runner.assert_security_behavior(fixture)
+            test_auth = fixture / "test_auth.py"
+            test_auth.write_text(
+                test_auth.read_text(encoding="utf-8").replace(
+                    "        self.assertFalse(authenticate('wrong'))\n",
+                    "        self.assertFalse(authenticate('wrong'))\n\n"
+                    "    def test_non_ascii(self):\n"
+                    "        self.assertFalse(authenticate('é'))\n",
+                ),
+                encoding="utf-8",
+            )
+            security_probe = runner.assert_security_behavior(fixture)
+            self.assertTrue(security_probe["passed"])
+            self.assertTrue(security_probe["repository_non_ascii_probe"])
 
             (fixture / "auth.py").write_text(
                 "import hmac\n\n"
@@ -1945,6 +2324,14 @@ class E2EDispatchTests(unittest.TestCase):
             ["scout", "mech-executor", "verifier"],
         )
         self.assertEqual(
+            cases["cue-free-discovery"]["gate"]["parent_response"],
+            {"path": "secret_marker.txt", "line": 1},
+        )
+        self.assertEqual(
+            cases["cue-free-mechanical"]["gate"]["implementation"]["changed_files"],
+            ["README.md", "auth.py", "test_auth.py"],
+        )
+        self.assertEqual(
             cases["cue-free-discovery"]["gate"]["discovery"][
                 "parent_tools_before_scout"
             ],
@@ -1966,6 +2353,11 @@ class E2EDispatchTests(unittest.TestCase):
         self.assertTrue(
             cases["cue-free-judgment"]["gate"]["behavior_probe"]["passed"]
         )
+        self.assertTrue(
+            cases["cue-free-judgment"]["gate"]["behavior_probe"][
+                "sole_retry_handler_checked"
+            ]
+        )
         self.assertEqual(
             cases["cue-free-judgment"]["gate"]["behavior_probe"][
                 "repository_mutants_rejected"
@@ -1978,6 +2370,11 @@ class E2EDispatchTests(unittest.TestCase):
         )
         self.assertTrue(
             cases["cue-free-security"]["gate"]["behavior_probe"]["passed"]
+        )
+        self.assertTrue(
+            cases["cue-free-security"]["gate"]["behavior_probe"][
+                "repository_non_ascii_probe"
+            ]
         )
         for case_name in (
             "cue-free-mechanical",

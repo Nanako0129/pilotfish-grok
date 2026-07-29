@@ -67,8 +67,8 @@ latency benchmark.
 The original v1.0.3 record ran before Claude compatibility isolation was added
 and is retained in the research report only as contaminated historical
 evidence. The accepted v1.0.6 candidate `results.json` is run
-`94c39a5c-29cb-4da9-b44e-2915daddc534`: all four cue-free cases passed in
-447.599 seconds of aggregate case time with `$1.0902748` in client cost fields,
+`81fcb0d1-cebf-4b93-b905-219afbac11b9`: all four cue-free cases passed in
+405.759 seconds of aggregate case time with `$1.1538876` in client cost fields,
 and their persisted spawn events covered all seven roles. The artifact records
 the v1.0.6 policy plus byte-for-byte matching candidate agent and role files
 loaded from an isolated temporary `GROK_HOME`; the user's global v1.0.5 install

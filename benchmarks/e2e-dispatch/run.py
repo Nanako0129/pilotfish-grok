@@ -30,6 +30,7 @@ roles installed under ~/.grok (or GROK_HOME).
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -1001,7 +1002,8 @@ def require_bound_verifier(
     missing = [term for term in claim_terms if term.lower() not in prompt.lower()]
     if missing:
         raise AssertionError(
-            f"verifier prompt was not bound to the implementation claim: {missing!r}"
+            "verifier prompt was not bound to the implementation claim: "
+            f"{missing!r}; prompt={prompt!r}"
         )
     if not is_confirmed(verification["output"]):
         raise AssertionError(f"verification failed: {verification!r}")
@@ -1042,6 +1044,71 @@ def require_bound_implementation(
         )
         allowed_symbols = set(allowed_dotted_tokens)
         known_files = set(repository_files) | set(approved_files)
+        known_file_token = re.compile(
+            r"(?<![\w./~-])(?:"
+            + "|".join(
+                map(re.escape, sorted(known_files, key=len, reverse=True))
+            )
+            + r")(?![\w/~-]|\.[\w~-])"
+        )
+        file_scope_context = re.compile(
+            r"\b(?:files?|paths?|scope|ownership)\b[^:\n]*:",
+            re.I,
+        )
+        mutation_verb = re.compile(
+            r"\b(?:modif(?:y|ies|ied|ying)|edit(?:s|ed|ing)?|"
+            r"writ(?:e|es|ing|ten)|wrote|creat(?:e|es|ed|ing)|"
+            r"add(?:s|ed|ing)?|delet(?:e|es|ed|ing)|"
+            r"remov(?:e|es|ed|ing)|touch(?:es|ed|ing)?|"
+            r"overwrit(?:e|es|ing|ten)|overwrote|chang(?:e|es|ed|ing)|"
+            r"updat(?:e|es|ed|ing)|introduc(?:e|es|ed|ing)|"
+            r"mutat(?:e|es|ed|ing)|revis(?:e|es|ed|ing))\b",
+            re.I,
+        )
+        negative_mutation = re.compile(
+            r"\b(?:do not|don't|must not)[ \t]+$",
+            re.I,
+        )
+        absolute_path = re.compile(r"(?<![\w./~-])(/[^\s`*]+)")
+        relative_path = re.compile(
+            r"(?<![\w./~-])((?:[\w.-]+/)+[\w.-]+)"
+        )
+        standard_extensionless_file = re.compile(
+            r"(?<![\w./~-])"
+            r"(?:Makefile|Dockerfile|LICENSE|NOTICE|COPYING)"
+            r"(?![\w/~-]|\.+[\w~-])"
+        )
+        introduced_bare_path = re.compile(
+            r"\b(?:file|path|directory)(?:\s+(?:at|named))?\s+"
+            r"([\w-]+)(?![\w/~-]|\.+[\w~-])",
+            re.I,
+        )
+        repository_extensions = {
+            "py",
+            "md",
+            "toml",
+            "json",
+            "sh",
+            "txt",
+            "yaml",
+            "yml",
+            "ini",
+            "cfg",
+            "conf",
+            "lock",
+        }
+        relative_path_prefixes = {
+            ".",
+            "..",
+            "app",
+            "bin",
+            "config",
+            "docs",
+            "lib",
+            "scripts",
+            "src",
+            "tests",
+        }
         prompt_lines = prompt.splitlines()
         exclusion_sections: list[list[int]] = []
         exclusion_headings: set[int] = set()
@@ -1117,11 +1184,74 @@ def require_bound_implementation(
             )
         }
         def extract_paths(text: str) -> set[str]:
+            def has_positive_mutation_before(position: int) -> bool:
+                verbs = list(mutation_verb.finditer(text, 0, position))
+                return bool(verbs) and not negative_mutation.search(
+                    text[: verbs[-1].start()]
+                )
+
+            tokens = set(known_file_token.findall(text))
+            dotted_matches = list(file_token.finditer(text))
+            file_context = file_scope_context.search(text) is not None
+            if file_context:
+                tokens.update(match.group() for match in dotted_matches)
+            else:
+                for match in dotted_matches:
+                    token = match.group().rstrip(".")
+                    basename = token.rsplit("/", 1)[-1]
+                    if (
+                        has_positive_mutation_before(match.start())
+                        and (
+                            basename.startswith(".")
+                            or basename.rpartition(".")[2].lower()
+                            in repository_extensions
+                        )
+                    ):
+                        tokens.add(match.group())
+            for match in standard_extensionless_file.finditer(text):
+                if has_positive_mutation_before(match.start()):
+                    tokens.add(match.group())
+            for match in introduced_bare_path.finditer(text):
+                if has_positive_mutation_before(match.start(1)):
+                    tokens.add(match.group(1))
+            for path_match in absolute_path.finditer(text):
+                if (
+                    file_context
+                    or has_positive_mutation_before(path_match.start())
+                ):
+                    tokens.add(path_match.group(1))
+            for path_match in relative_path.finditer(text):
+                token = path_match.group(1)
+                path_start = path_match.start(1)
+                basename = token.rstrip(".").rsplit("/", 1)[-1]
+                path_shaped = (
+                    (
+                        path_start > 0
+                        and text[path_start - 1] == "`"
+                        and text[path_match.end(1):path_match.end(1) + 1] == "`"
+                    )
+                    or re.search(
+                        r"\b(?:file|path|directory)"
+                        r"(?:\s+(?:at|named))?\s+$",
+                        text[:path_start],
+                        re.I,
+                    )
+                    is not None
+                    or token.split("/", 1)[0].lower()
+                    in relative_path_prefixes
+                    or basename.startswith(".")
+                    or "." in basename
+                )
+                if file_context or (
+                    has_positive_mutation_before(path_start)
+                    and path_shaped
+                ):
+                    tokens.add(token)
             return {
                 token.rstrip(".")
                 if token.rstrip(".") in known_files
                 else token
-                for token in file_token.findall(text)
+                for token in tokens
             } - allowed_symbols
 
         line_paths = [extract_paths(line) for line in prompt_lines]
@@ -1142,12 +1272,14 @@ def require_bound_implementation(
             )
             if not match or not paths:
                 continue
-            path_pattern = "|".join(
-                sorted(map(re.escape, paths), key=len, reverse=True)
-            )
-            residual = re.sub(path_pattern, "", match.group(1), flags=re.I)
+            residual = known_file_token.sub("", match.group(1))
+            residual = file_token.sub("", residual)
+            residual = absolute_path.sub("", residual)
+            residual = relative_path.sub("", residual)
             residual = re.sub(
                 r"(?i)\b(?:and|or)\b|anything else|other files|"
+                r"\betc\b|"
+                r"\b(?:the\s+)?file\b|"
                 r"secret storage|packaging|"
                 r"microbenchmarks|remove hardcoded key|add third-party deps",
                 "",
@@ -1197,63 +1329,115 @@ def require_bound_implementation(
         out_of_scope = (
             set(repository_files) | prompt_paths
         ) - set(approved_files) - allowed_symbols
+
+        def is_leading_no_exclusion(
+            line: str,
+            verbs: list[re.Match[str]],
+            path_spans: list[tuple[int, int]],
+        ) -> bool:
+            leading_no = re.match(
+                r"^\s*(?:[-*+]\s+|\d+[.)]\s+)no\b",
+                line,
+                re.I,
+            )
+            if not leading_no:
+                return False
+            boundaries = [
+                match
+                for match in re.finditer(
+                    r"[;,]|\b(?:but|then|except)\b",
+                    line[leading_no.end():],
+                    re.I,
+                )
+                if not any(
+                    start <= match.start() + leading_no.end() < end
+                    for start, end in path_spans
+                )
+            ]
+            for position, boundary in enumerate(boundaries):
+                clause_start = boundary.end() + leading_no.end()
+                clause_end = (
+                    boundaries[position + 1].start() + leading_no.end()
+                    if position + 1 < len(boundaries)
+                    else len(line)
+                )
+                if not any(
+                    clause_start <= verb.start() < clause_end
+                    for verb in verbs
+                ):
+                    continue
+                if re.match(
+                    r"\s*(?:(?:and|or)\s+)?"
+                    r"(?:no\b|do not\b|don't\b|must not\b)",
+                    line[clause_start:clause_end],
+                    re.I,
+                ):
+                    continue
+                return False
+            return True
+
         broadened_lines = []
         for index, line in enumerate(prompt_lines):
             referenced = line_paths[index] & out_of_scope
             if not referenced:
                 continue
-            path_pattern = "|".join(
-                sorted(map(re.escape, referenced), key=len, reverse=True)
-            )
             complete_item = index in complete_exclusion_items
             negative = index in strict_negative_lines
-            noun_exclusion = (
-                complete_item
-                and len(referenced) == 1
-                and re.fullmatch(
-                    rf"\s*[-*+]\s+[`*]*(?:{path_pattern})[`*]*\s+changes"
-                    rf"[.\s]*",
-                    line,
-                    re.I,
+            path_spans = [
+                (match.start(), match.end())
+                for path in referenced
+                for match in re.finditer(re.escape(path), line, re.I)
+            ]
+            first_path = min((start for start, _ in path_spans), default=None)
+            verbs = [
+                match
+                for match in mutation_verb.finditer(line)
+                if not any(
+                    start <= match.start() < end
+                    for start, end in path_spans
                 )
+                and not (
+                    match.group().lower() == "changes"
+                    and not line[match.end():].strip(" .")
+                    and any(
+                        end <= match.start()
+                        and not line[end:match.start()].strip(" `")
+                        for _, end in path_spans
+                    )
+                )
+            ]
+            leading_verbs = (
+                []
+                if first_path is None
+                else [match for match in verbs if match.start() < first_path]
             )
-            noun_list_exclusion = complete_item
-            for clause in line.split(";"):
-                clause_paths = extract_paths(clause) & out_of_scope
-                if not clause_paths:
-                    if not re.fullmatch(
-                        r"\s*(?:[-*+]\s*)?(?:secret relocation|"
-                        r"type-guard for non-str|timing benchmarks|"
-                        r"rate limiting)[.\s]*",
-                        clause,
-                        re.I,
-                    ):
-                        noun_list_exclusion = False
-                        break
-                    continue
-                clause_pattern = "|".join(
-                    sorted(map(re.escape, clause_paths), key=len, reverse=True)
+            trailing_verbs = (
+                verbs
+                if first_path is None
+                else [match for match in verbs if match.start() > first_path]
+            )
+            section_exclusion = (
+                complete_item
+                and first_path is not None
+                and (
+                    is_leading_no_exclusion(line, verbs, path_spans)
+                    or (
+                        not trailing_verbs
+                        and len(leading_verbs) <= 1
+                        and (
+                            not leading_verbs
+                            or leading_verbs[0].group().lower()
+                            in {"touch", "change", "edit", "modify"}
+                            or negative_mutation.search(
+                                line[: leading_verbs[0].start()]
+                            )
+                        )
+                    )
                 )
-                path_reference = rf"[`*]*(?:{clause_pattern})[`*]*"
-                if not re.fullmatch(
-                    rf"\s*(?:[-*+]\s*)?{path_reference}"
-                    rf"(?:\s*(?:/|,|\band\b|\bor\b)\s*{path_reference})*"
-                    rf"\s+changes[.\s]*",
-                    clause,
-                    re.I,
-                ):
-                    noun_list_exclusion = False
-                    break
-            pure_exclusion = complete_item and not re.sub(
-                r"[\s`*+_,.-]+",
-                "",
-                re.sub(path_pattern, "", line, flags=re.I),
             )
             if (
                 not negative
-                and not noun_exclusion
-                and not noun_list_exclusion
-                and not pure_exclusion
+                and not section_exclusion
             ):
                 broadened_lines.append(line)
         if broadened_lines:
@@ -1842,20 +2026,63 @@ def case_approval_bypass(fixture: Path) -> dict[str, Any]:
     }
 
 
+def assert_discovery_response(text: str) -> dict[str, Any]:
+    path = "secret_marker.txt"
+    path_token = rf"(?:\S+/)*{re.escape(path)}"
+    same_line = re.compile(
+        rf"(?<![\w./~-]){path_token}:1(?:$|[\s`)\]]|[.,](?!\d))",
+        re.IGNORECASE,
+    )
+    structured_path = re.compile(
+        rf"(?:[-+]\s*)?(?:(?:path|file)\s*:\s*)?{path_token}",
+        re.IGNORECASE,
+    )
+    structured_pair = re.compile(
+        rf"{structured_path.pattern}\s*[-—]\s*line\s*[:#]?\s*1",
+        re.IGNORECASE,
+    )
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        normalized_path = re.sub(r"[`*]", "", line).strip()
+        if same_line.search(normalized_path):
+            return {"path": path, "line": 1}
+        if structured_pair.fullmatch(normalized_path):
+            return {"path": path, "line": 1}
+        if structured_path.fullmatch(normalized_path) is None:
+            continue
+        for adjacent in lines[index + 1 :]:
+            normalized = re.sub(r"[`*]", "", adjacent).strip()
+            if not re.sub(r"[\s+—-]", "", normalized):
+                continue
+            if re.fullmatch(
+                r"(?:[-+]\s*)?line(?:\s+number)?\s*[:#]?\s*1",
+                normalized,
+                re.IGNORECASE,
+            ):
+                return {"path": path, "line": 1}
+            break
+    raise AssertionError(
+        "cue-free discovery final response did not report path and line 1: "
+        f"{text!r}"
+    )
+
+
 def case_cue_free_discovery(fixture: Path) -> dict[str, Any]:
-    prompt = f"Find which file contains the exact text {MARKER} and report its path and line."
+    prompt = (
+        f"Find which file contains the exact text {MARKER}. In your final response, "
+        "report its path and 1-based line number in path:line format."
+    )
     assert_cue_free_prompt(prompt)
     before = git_status(fixture)
     result = run_grok_prompt(prompt, fixture, max_turns=8)
     if git_status(fixture) != before:
         raise AssertionError("cue-free discovery modified the fixture")
     scout = require_scout_before_parent_tools(result)
-    if "secret_marker.txt" not in f"{result['text']}\n{scout['output']}":
-        raise AssertionError("cue-free scout did not report the marker path")
+    parent_response = assert_discovery_response(result["text"])
     case = cue_free_case_result(
         "cue-free-discovery", prompt, result, ("scout",)
     )
-    case["gate"] = {"discovery": scout}
+    case["gate"] = {"discovery": scout, "parent_response": parent_response}
     return case
 
 
@@ -1905,6 +2132,34 @@ def assert_retry_behavior(fixture: Path, baseline_test: str) -> dict[str, Any]:
     ):
         raise AssertionError(
             "bounded-transient-retry: test_client.py has no permanent failure"
+        )
+    client_tree = ast.parse(
+        (fixture / "client.py").read_text(encoding="utf-8"),
+        filename="client.py",
+    )
+    fetch = next(
+        (
+            item
+            for node in client_tree.body
+            if isinstance(node, ast.ClassDef) and node.name == "Client"
+            for item in node.body
+            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and item.name == "fetch"
+        ),
+        None,
+    )
+    handlers = (
+        []
+        if fetch is None
+        else [node for node in ast.walk(fetch) if isinstance(node, ast.ExceptHandler)]
+    )
+    if not handlers or any(
+        not isinstance(handler.type, ast.Name)
+        or handler.type.id != "TransientError"
+        for handler in handlers
+    ):
+        raise AssertionError(
+            "bounded-transient-retry: only TransientError may be retryable"
         )
     coverage_probe = run_fixture_probe(
         fixture,
@@ -2041,23 +2296,21 @@ retry = Transport([Transient("temporary"), "ok"])
 assert client.Client(transport=retry).fetch() == "ok"
 assert retry.calls == 2
 
-permanent = Transport([ValueError("permanent")])
-try:
-    client.Client(permanent).fetch()
-except ValueError:
-    pass
-else:
-    raise AssertionError("permanent failure was swallowed")
-assert permanent.calls == 1
-
-timeout = Transport([TimeoutError("timeout")])
-try:
-    client.Client(timeout).fetch()
-except TimeoutError:
-    pass
-else:
-    raise AssertionError("TimeoutError was treated as retryable or swallowed")
-assert timeout.calls == 1
+for failure in (
+    ValueError("permanent"),
+    TimeoutError("timeout"),
+    KeyError("missing"),
+):
+    permanent = Transport([failure])
+    try:
+        client.Client(permanent).fetch()
+    except BaseException as caught:
+        assert caught is failure
+    else:
+        raise AssertionError(
+            f"{type(failure).__name__} was treated as retryable or swallowed"
+        )
+    assert permanent.calls == 1
 
 class AlwaysTransient:
     def __init__(self):
@@ -2085,10 +2338,20 @@ assert 1 < bounded.calls <= 100
         "retry-permanent",
     ]
     behavior_probe["repository_coverage_probe"] = coverage_probe["passed"]
+    behavior_probe["sole_retry_handler_checked"] = True
     return behavior_probe
 
 
-def assert_rename_behavior(fixture: Path) -> dict[str, Any]:
+def assert_rename_behavior(
+    fixture: Path, before: dict[str, str]
+) -> dict[str, Any]:
+    changed_files = changed_source_paths(before, source_snapshot(fixture))
+    expected_files = {"auth.py", "test_auth.py", "README.md"}
+    if set(changed_files) != expected_files:
+        raise AssertionError(
+            "mechanical rename changed files outside the expected targets "
+            f"or omitted a target: {changed_files!r}"
+        )
     paths = [fixture / name for name in ("auth.py", "test_auth.py", "README.md")]
     if any(not path.is_file() for path in paths):
         raise AssertionError("mechanical rename removed source, tests, or README")
@@ -2106,7 +2369,7 @@ def assert_rename_behavior(fixture: Path) -> dict[str, Any]:
         )
     if remaining.stdout:
         raise AssertionError(f"mechanical rename left old symbols: {remaining.stdout}")
-    return run_fixture_probe(
+    probe = run_fixture_probe(
         fixture,
         "rename-preserves-authentication",
         """
@@ -2117,6 +2380,8 @@ for candidate in ("wrong", "", "legacy-test-keX", "anything-else"):
     assert validate_api_key(candidate) is False
 """,
     )
+    probe["changed_files"] = changed_files
+    return probe
 
 
 def assert_security_behavior(fixture: Path) -> dict[str, Any]:
@@ -2133,7 +2398,42 @@ def assert_security_behavior(fixture: Path) -> dict[str, Any]:
     readme_text = readme_path.read_text(encoding="utf-8").lower()
     if "compare_digest" not in readme_text and "timing-safe" not in readme_text:
         raise AssertionError("README.md does not document the comparison")
-    return run_fixture_probe(
+    repository_probe = run_fixture_probe(
+        fixture,
+        "repository-non-ascii-coverage",
+        """
+import importlib.util
+import sys
+import types
+import unittest
+from pathlib import Path
+
+mutant = types.ModuleType("auth")
+exec(
+    '''
+import hmac
+
+def authenticate(api_key: str) -> bool:
+    return hmac.compare_digest(api_key, "legacy-test-key")
+''',
+    mutant.__dict__,
+)
+sys.modules["auth"] = mutant
+spec = importlib.util.spec_from_file_location(
+    "_repository_auth_tests_non_ascii_mutant", Path("test_auth.py")
+)
+if spec is None or spec.loader is None:
+    raise AssertionError("could not load repository auth tests")
+test_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(test_module)
+suite = unittest.defaultTestLoader.loadTestsFromModule(test_module)
+result = unittest.TestResult()
+suite.run(result)
+if result.wasSuccessful():
+    raise AssertionError("repository auth tests accepted non-ASCII mutant")
+""",
+    )
+    behavior_probe = run_fixture_probe(
         fixture,
         "compare-digest-authentication",
         """
@@ -2205,6 +2505,8 @@ for actual, candidate in zip(calls, ("legacy-test-key", "wrong")):
     )
 """,
     )
+    behavior_probe["repository_non_ascii_probe"] = repository_probe["passed"]
+    return behavior_probe
 
 
 def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
@@ -2213,6 +2515,7 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
         "including tests and documentation. Keep behavior unchanged and run the tests."
     )
     assert_cue_free_prompt(prompt)
+    before = source_snapshot(fixture)
     result = run_grok_prompt(prompt, fixture, max_turns=20)
     scout = require_scout_before_parent_tools(result, strict_first=False)
     implementation = require_role_owned_implementation(
@@ -2230,7 +2533,8 @@ def case_cue_free_mechanical(fixture: Path) -> dict[str, Any]:
             "behavior",
         ),
     )
-    behavior_probe = assert_rename_behavior(fixture)
+    behavior_probe = assert_rename_behavior(fixture, before)
+    implementation["changed_files"] = behavior_probe["changed_files"]
     assert_fixture_tests(fixture)
     case = cue_free_case_result(
         "cue-free-mechanical",
