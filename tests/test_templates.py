@@ -99,6 +99,8 @@ class TemplateContractTests(unittest.TestCase):
             "Regressions caused by the reviewed implementation are claim-relevant",
             normalized,
         )
+        self.assertIn("For every finding or advisory under any verdict", normalized)
+        self.assertIn("any reproducible high-impact user/system failure", normalized)
         self.assertRegex(
             normalized,
             r"Priority P0-P4.*Confidence.*Evidence.*Expected.*Actual.*Recheck",

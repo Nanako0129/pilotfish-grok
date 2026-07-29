@@ -182,11 +182,13 @@ for reproducibility, whether it was introduced and is in scope, exact-claim
 relevance, severity/priority, and confidence. A P0/P1 label requires reproducible
 evidence of both severity and exact-claim relevance. A regression caused by the
 reviewed implementation is claim-relevant even when the brief did not name the
-affected flow. Fix an in-scope P0/P1 or
-pause and ask; never silently defer, reject, downgrade, or call it fixed without
-contrary evidence or a successful recheck of the original failure. Fix a P2
-when it is bounded and inside explicit acceptance; otherwise defer it with
-rationale and narrow the final claim when needed. P3/P4 are non-blocking
+affected flow. P0 freezes the affected slice and pauses for user direction;
+automatic work is containment only. Fix P1 within approved scope or pause and
+ask. An introduced P2 regression remains blocking and must be fixed within
+approved scope or paused; fix other P2 findings when bounded and inside explicit
+acceptance, otherwise defer them with rationale and narrow the final claim when
+needed. Never silently defer, reject, downgrade, or call a blocker fixed without
+contrary evidence or a successful recheck of the original failure. P3/P4 are non-blocking
 advisories: report or defer them, with no dedicated fix/reverify loop.
 `INCONCLUSIVE` gets one retry only after evidence, prerequisites, contract, or
 environment materially changes; otherwise pause the affected slice.
@@ -213,10 +215,10 @@ continue the affected slice. Only the main session asks, never a child.
 
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Blocking P1/P2 recovery shares at most five materially changed fix/reverify
-passes per stable slice and claim: passes 1-2 are normal and 3-5 are recovery.
+passes per stable slice, claim, and acceptance: passes 1-2 are normal and 3-5 are recovery.
 Track a candidate-state fingerprint containing the committed head plus
 working-tree diff or tested-artifact digest; never reverify the same
-fingerprint, claim, and environment. After five failed passes, mark the slice
+fingerprint, claim, acceptance, and environment. After five failed passes, mark the slice
 `PAUSED_VERIFICATION`, block dependents, and continue unrelated safe approved
 slices only when the risk is not cross-cutting. A blocking P2 counts against
 that shared budget and joins the next coherent integration-boundary

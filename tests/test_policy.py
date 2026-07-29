@@ -143,12 +143,14 @@ class PolicyTests(unittest.TestCase):
         policy = " ".join(POLICY.read_text(encoding="utf-8").split())
 
         self.assertIn("`CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`", policy)
-        self.assertRegex(
-            policy,
-            r"P0/P1 label requires reproducible evidence.*"
-            r"P2 when it is bounded.*P3/P4 are non-blocking advisories.*"
-            r"`INCONCLUSIVE` gets one retry only",
-        )
+        for phrase in (
+            "P0/P1 label requires reproducible evidence",
+            "introduced P2 regression remains blocking",
+            "fix other P2 findings when bounded",
+            "P3/P4 are non-blocking advisories",
+            "`INCONCLUSIVE` gets one retry only",
+        ):
+            self.assertIn(phrase, policy)
         self.assertRegex(
             policy,
             r"announce `AUTO` or `ASK`.*"
@@ -170,11 +172,12 @@ class PolicyTests(unittest.TestCase):
             r"Blocking P1/P2 recovery shares at most five materially changed "
             r"fix/reverify passes.*"
             r"passes 1-2 are normal and 3-5 are recovery.*"
-            r"candidate-state fingerprint.*same fingerprint, claim, and environment.*"
+            r"candidate-state fingerprint.*same fingerprint, claim, acceptance, and environment.*"
             r"`PAUSED_VERIFICATION`.*"
             r"blocking P2 counts against that shared budget.*"
             r"P3/P4 get no dedicated loop",
         )
+        self.assertIn("introduced P2 regression remains blocking", policy)
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):

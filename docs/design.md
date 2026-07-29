@@ -77,7 +77,8 @@ P3/P4 remain advisory. Unsafe or insufficient evidence produces
 `INCONCLUSIVE` with a retry condition. The main session independently
 adjudicates reproducibility, scope, claim relevance, priority, and confidence.
 Regressions caused by the reviewed implementation remain claim-relevant even
-when the brief omitted the affected flow.
+when the brief omitted the affected flow. P0 freezes the slice, and introduced
+P2 regressions must be fixed or paused rather than hidden by a narrowed claim.
 
 ### Capability enforcement order
 
@@ -137,9 +138,9 @@ tool only when the current session exposes one; otherwise the turn ends
 P0 freezes the affected dependency chain. Blocking P1/P2 recovery shares five
 materially changed fix/reverify passes (1-2 normal, 3-5 recovery) before
 `PAUSED_VERIFICATION`; candidate identity includes committed head plus
-working-tree diff or tested-artifact digest. P2 waits for the next coherent
-boundary, P3/P4 get no dedicated loop, and `INCONCLUSIVE` gets one retry after
-a material change.
+working-tree diff or tested-artifact digest, while verification identity also
+includes acceptance. P2 waits for the next coherent boundary, P3/P4 get no
+dedicated loop, and `INCONCLUSIVE` gets one retry after a material change.
 
 ## Deliberately left out
 
