@@ -72,9 +72,10 @@ and flow reproduction, so the Grok mapping is `execute` (read + shell, no file
 edits).
 
 The verifier receives an exact claim and acceptance and reports calibrated
-evidence, not finding volume. `REFUTED` needs a reproducible P0-P2 blocker;
-P3/P4 remain advisory. Unsafe or insufficient evidence produces
-`INCONCLUSIVE` with a retry condition. The main session independently
+evidence, not finding volume. `REFUTED` needs a reproducible P0-P2 blocker and
+takes precedence over missing evidence for another condition. Without such a
+blocker, any unevaluated required condition produces `INCONCLUSIVE` with a
+retry condition. P3/P4 remain advisory. The main session independently
 adjudicates reproducibility, scope, claim relevance, priority, and confidence.
 Regressions caused by the reviewed implementation remain claim-relevant even
 when the brief omitted the affected flow. P0 freezes the slice, and introduced

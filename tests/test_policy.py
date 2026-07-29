@@ -147,6 +147,7 @@ class PolicyTests(unittest.TestCase):
             "P0/P1 label requires reproducible evidence",
             "introduced P2 regression remains blocking",
             "fix other P2 findings when bounded",
+            "A documented regrade may use the verifier's cited evidence",
             "P3/P4 are non-blocking advisories",
             "`INCONCLUSIVE` gets one retry only",
         ):

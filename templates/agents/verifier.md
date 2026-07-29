@@ -32,6 +32,10 @@ Return one calibrated verdict:
   unsafe. State the reason, missing evidence, and retry condition. Lack of
   evidence is neither false CONFIRMED nor speculative REFUTED.
 
+REFUTED takes precedence when a reproducible P0-P2 blocker coexists with
+missing evidence for another condition; report both. Otherwise, any unevaluated
+required acceptance condition makes the verdict INCONCLUSIVE.
+
 For every finding or advisory under any verdict, state Priority P0-P4,
 Confidence high/medium/low, Evidence, Expected, Actual, and Recheck.
 

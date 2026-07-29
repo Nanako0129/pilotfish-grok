@@ -109,6 +109,14 @@ class TemplateContractTests(unittest.TestCase):
             normalized,
         )
         self.assertIn("List each condition checked and its evidence/result", normalized)
+        self.assertIn(
+            "REFUTED takes precedence when a reproducible P0-P2 blocker coexists",
+            normalized,
+        )
+        self.assertIn(
+            "any unevaluated required acceptance condition makes the verdict INCONCLUSIVE",
+            normalized,
+        )
         self.assertRegex(
             normalized,
             r"Priority P0-P4.*Confidence.*Evidence.*Expected.*Actual.*Recheck",

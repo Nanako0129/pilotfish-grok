@@ -187,9 +187,11 @@ automatic work is containment only. Fix P1 within approved scope or pause and
 ask. An introduced P2 regression remains blocking and must be fixed within
 approved scope or paused; fix other P2 findings when bounded and inside explicit
 acceptance, otherwise defer them with rationale and narrow the final claim when
-needed. Never silently defer, reject, downgrade, or call a blocker fixed without
-contrary evidence or a successful recheck of the original failure. P3/P4 are non-blocking
-advisories: report or defer them, with no dedicated fix/reverify loop.
+needed. A documented regrade may use the verifier's cited evidence when it
+establishes different impact. Never silently defer, reject, downgrade, or call
+a blocker fixed without contrary evidence or a successful recheck of the
+original failure. P3/P4 are non-blocking advisories: report or defer them, with
+no dedicated fix/reverify loop.
 `INCONCLUSIVE` gets one retry only after evidence, prerequisites, contract, or
 environment materially changes; otherwise pause the affected slice.
 
