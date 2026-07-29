@@ -136,14 +136,16 @@ and bounded P2 adjudication, never new VCS, publish, install, credential,
 destructive, external, scope, or spend authority. `ASK` uses a native question
 tool only when the current session exposes one; otherwise the turn ends
 `PAUSED_NEEDS_USER`, and headless execution exits without polling or guessing.
-P0 freezes the affected dependency chain. Blocking P1/P2 recovery shares five
-materially changed fix/reverify passes (1-2 normal, 3-5 recovery) before
+P0 freezes the affected dependency chain. Every verification run shares five
+materially changed P1/P2 fix/reverify passes (1-2 normal, 3-5 recovery) before
 `PAUSED_VERIFICATION`. Verification identity includes the complete tested
-candidate, claim, acceptance, contract, available evidence or prerequisites,
-and environment. The candidate fingerprint covers committed head, tracked and
-staged diff, and untracked input paths plus content, or a tested-artifact
-digest. P2 waits for the next coherent boundary, P3/P4 get no dedicated loop,
-and `INCONCLUSIVE` gets one retry after a material change.
+candidate, claim, acceptance, contract, external evidence or prerequisites, and
+environment; a prior verifier's own output is not a change. The candidate
+fingerprint covers committed head, tracked and staged diff, untracked input
+paths plus content, and dirty submodule content. Artifact digests complement
+source identity unless the artifact is the sole deliverable. P2 waits for the
+next coherent boundary, P3/P4 get no dedicated loop, and `INCONCLUSIVE` gets one
+retry after a material change.
 
 ## Deliberately left out
 

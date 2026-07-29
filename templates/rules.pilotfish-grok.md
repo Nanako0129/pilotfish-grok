@@ -185,9 +185,10 @@ reviewed implementation is claim-relevant even when the brief did not name the
 affected flow. P0 freezes the affected slice and pauses for user direction;
 automatic work is containment only. Fix P1 within approved scope or pause and
 ask. An introduced P2 regression remains blocking and must be fixed within
-approved scope or paused; fix other P2 findings when bounded and inside explicit
-acceptance, otherwise defer them with rationale and narrow the final claim when
-needed. A documented regrade may use the verifier's cited evidence when it
+approved scope or paused; fix other P2 findings only when bounded, inside
+explicit acceptance, and inside approved scope, otherwise defer them with
+rationale and narrow the final claim when needed. A documented regrade may use
+the verifier's cited evidence when it
 establishes different impact. Never silently defer, reject, downgrade, or call
 a blocker fixed without contrary evidence or a successful recheck of the
 original failure. P3/P4 are non-blocking advisories: report or defer them, with
@@ -195,12 +196,16 @@ no dedicated fix/reverify loop.
 `INCONCLUSIVE` gets one retry only after evidence, prerequisites, contract, or
 environment materially changes; otherwise pause the affected slice.
 
-### Long autonomous runs
+### Verification recovery and long autonomous runs
+
+The recovery budget and severity rules below apply to every verification run;
+`AUTO`/`ASK` clauses apply only to likely long autonomous work.
 
 Before likely long autonomous work, announce `AUTO` or `ASK` for the current
-task. Sleeping, eating, or leaving the agent alone grants no authority.
-Explicitly asking it to continue while the user is away selects `AUTO` and must
-be announced. `/goal` preserves only the objective. These uppercase
+task. Sleeping, eating, or leaving the agent alone grants no authority. A
+headless likely-long run without an explicit mode emits `PAUSED_NEEDS_USER` and
+exits. Explicitly asking it to continue while the user is away selects `AUTO`
+and must be announced. `/goal` preserves only the objective. These uppercase
 orchestration labels do not toggle Grok's `/auto` or permission mode.
 
 `AUTO` permits only approved-scope reversible work and main-session P2
@@ -218,13 +223,16 @@ continue the affected slice. Only the main session asks, never a child.
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Blocking P1/P2 recovery shares at most five materially changed fix/reverify
 passes: passes 1-2 are normal and 3-5 are recovery. Each pass needs a material
-change to the stable verification identity: candidate, claim, acceptance,
-contract, available evidence or prerequisites, or environment. Fingerprint the
-complete tested candidate from committed head, tracked and staged diff, and
-untracked input paths plus content; a tested-artifact digest may replace that
-input fingerprint. Never reverify the same complete identity. After five failed
-passes, mark the slice `PAUSED_VERIFICATION`, block dependents, and continue
-unrelated safe approved slices only when the risk is not cross-cutting. A
+change to candidate, claim, acceptance, contract, external evidence or
+prerequisites, or environment; the immediately preceding verifier's verdict or
+output alone is not new evidence. Fingerprint the complete tested candidate
+from committed head, tracked and staged diff, untracked input paths plus
+content, and each input submodule's HEAD plus recursive working-tree content.
+Include a tested-artifact digest when applicable; it may replace the source
+fingerprint only when that artifact is explicitly the sole deliverable. Never
+reverify the same complete identity. After five failed passes, mark the slice
+`PAUSED_VERIFICATION`, block dependents, and continue unrelated safe approved
+slices only when the risk is not cross-cutting. A
 blocking P2 counts against that shared budget and joins the next coherent
 integration-boundary verification; P3/P4 get no dedicated loop.
 

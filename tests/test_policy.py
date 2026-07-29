@@ -146,7 +146,8 @@ class PolicyTests(unittest.TestCase):
         for phrase in (
             "P0/P1 label requires reproducible evidence",
             "introduced P2 regression remains blocking",
-            "fix other P2 findings when bounded",
+            "fix other P2 findings only when bounded",
+            "inside approved scope",
             "A documented regrade may use the verifier's cited evidence",
             "P3/P4 are non-blocking advisories",
             "`INCONCLUSIVE` gets one retry only",
@@ -169,18 +170,23 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
+            r"recovery budget and severity rules below apply to every verification run.*"
             r"P0 freezes its slice and dependents.*"
             r"Blocking P1/P2 recovery shares at most five materially changed "
             r"fix/reverify passes.*"
             r"passes 1-2 are normal and 3-5 are recovery.*"
-            r"stable verification identity.*available evidence or prerequisites.*"
+            r"external evidence or prerequisites.*immediately preceding verifier's "
+            r"verdict or output alone is not new evidence.*"
             r"tracked and staged diff.*untracked input paths plus content.*"
+            r"input submodule's HEAD plus recursive working-tree content.*"
+            r"artifact is explicitly the sole deliverable.*"
             r"Never reverify the same complete identity.*"
             r"`PAUSED_VERIFICATION`.*"
             r"blocking P2 counts against that shared budget.*"
             r"P3/P4 get no dedicated loop",
         )
         self.assertIn("introduced P2 regression remains blocking", policy)
+        self.assertIn("headless likely-long run without an explicit mode", policy)
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):
