@@ -84,7 +84,7 @@ flowchart LR
 | `security-reviewer` | read-only | high | Pre-approval security evidence |
 | `mech-executor` | all | low | Mechanical work from a complete spec |
 | `executor` | all | medium | Features and fixes needing judgment |
-| `verifier` | execute | medium | Outcome challenge; `CONFIRMED` / `REFUTED` |
+| `verifier` | execute | medium | Calibrated outcome check; `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
 | `security-executor` | all | high | Approved security-sensitive implementation |
 
 > **Claude-only `Explore` override is not installed.** Pilotfish uses that name
@@ -117,7 +117,7 @@ flowchart TD
     M --> V["verifier<br/>execute · effort medium"]
     E --> V
     SEC --> V
-    V -->|CONFIRMED / REFUTED| O
+    V -->|CONFIRMED / REFUTED / INCONCLUSIVE| O
 ```
 
 ### Dispatch principles
@@ -151,6 +151,7 @@ flowchart LR
     E --> V[Verification]
     V -->|REFUTED| E
     V -->|CONFIRMED| Done[Done]
+    V -->|INCONCLUSIVE| Pause[Pause or one material retry]
 ```
 
 | Phase | Gate | Eligible delegation |
@@ -159,11 +160,18 @@ flowchart LR
 | **Plan** | Program envelope plus independent slices | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice |
 | **Approval** | `READY` unlocks `exit_plan_mode`; user approves the verified Plan | Read-only only; no implementation brief yet |
 | **Execution** | Stable contract with exclusive ownership and done criteria | `mech-executor` / `executor` / `security-executor` |
-| **Verification** | Concrete claim to refute | Fresh `verifier` → `CONFIRMED` / `REFUTED` |
+| **Verification** | Exact claim and acceptance to test | Fresh `verifier` → `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
 
 For non-security-sensitive work, a single unknown bug's diagnosis, first fix,
 and live check stay in the main session when they share one evidence chain—do
 not turn that into a sequential `scout` → `executor` pipeline.
+
+Only reproducible P0-P2 blockers to the exact claim can produce `REFUTED`;
+P3/P4 are advisories, while insufficient evidence produces `INCONCLUSIVE`.
+Long work announces orchestration `AUTO` or `ASK`: `AUTO` adds no authority,
+`ASK` pauses when no native question tool is exposed, and blocking P1/P2 shares
+five materially changed passes. See [the design](docs/design.md#phase-aware-orchestration)
+for the full adjudication and recovery contract.
 
 ## Install
 
@@ -172,7 +180,7 @@ not turn that into a sequential `scout` → `executor` pipeline.
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

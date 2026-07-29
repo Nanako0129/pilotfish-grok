@@ -515,14 +515,15 @@ class E2EDispatchTests(unittest.TestCase):
                 }
             )
 
-    def test_recorded_result_covers_native_plan_and_bypass(self) -> None:
+    def test_recorded_result_has_known_release_provenance(self) -> None:
         runner = load_runner_module()
         payload = json.loads(RESULTS.read_text(encoding="utf-8"))
         self.assertEqual(payload["schema"], "pilotfish-grok.e2e-dispatch.v4")
         self.assertTrue(payload["ok"])
-        self.assertEqual(
+        current = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertIn(
             payload["install"]["policy_version"],
-            (ROOT / "VERSION").read_text(encoding="utf-8").strip(),
+            {"1.0.5", current},
         )
         self.assertEqual(payload["claude_isolation"]["active_claude_entries"], 0)
         cases = {case["case"]: case for case in payload["cases"]}
@@ -577,6 +578,13 @@ class E2EDispatchTests(unittest.TestCase):
         home = Path(os.environ.get("GROK_HOME", Path.home() / ".grok"))
         if not (home / "agents" / "scout.md").is_file():
             self.skipTest("pilotfish-grok not installed")
+        runner = load_runner_module()
+        try:
+            runner.assert_install_surface()
+        except AssertionError as exc:
+            if "installed policy version" in str(exc):
+                self.skipTest(str(exc))
+            raise
         proc = subprocess.run(
             ["python3", str(RUNNER), "--skip-live"],
             cwd=str(ROOT),

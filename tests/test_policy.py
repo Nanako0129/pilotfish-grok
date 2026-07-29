@@ -138,15 +138,55 @@ class PolicyTests(unittest.TestCase):
             "If an affected ID changes or is added, repeat security review",
         ):
             self.assertIn(phrase, policy)
+
+    def test_calibrated_adjudication_and_bounded_long_run_policy(self) -> None:
+        policy = " ".join(POLICY.read_text(encoding="utf-8").split())
+
+        self.assertIn("`CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`", policy)
         for phrase in (
-            "two consecutive `REFUTED` verdicts",
-            "fix the same claim",
-            "stop automatic fix-and-reverify cycling",
-            "the cap is not `CONFIRMED`",
-            "user-directed continuation remains allowed",
-            "substantially unchanged implementation",
+            "P0/P1 label requires reproducible evidence",
+            "introduced P2 regression remains blocking",
+            "fix other P2 findings only when bounded",
+            "inside approved scope",
+            "A documented regrade may use the verifier's cited evidence",
+            "P3/P4 are non-blocking advisories",
+            "`INCONCLUSIVE` gets one retry only",
         ):
-            self.assertIn(phrase, " ".join(policy.split()))
+            self.assertIn(phrase, policy)
+        self.assertRegex(
+            policy,
+            r"announce `AUTO` or `ASK`.*"
+            r"do not toggle Grok's `/auto` or permission mode",
+        )
+        self.assertRegex(
+            policy,
+            r"`AUTO` permits only approved-scope reversible work.*"
+            r"no version-control action.*external-mutation.*spend authority",
+        )
+        self.assertRegex(
+            policy,
+            r"`PAUSED_NEEDS_USER`.*Headless execution emits that pause and exits.*"
+            r"Only the main session asks, never a child",
+        )
+        self.assertRegex(
+            policy,
+            r"recovery budget and severity rules below apply to every verification run.*"
+            r"P0 freezes its slice and dependents.*"
+            r"Blocking P1/P2 recovery shares at most five materially changed "
+            r"fix/reverify passes.*"
+            r"passes 1-2 are normal and 3-5 are recovery.*"
+            r"external evidence or prerequisites.*immediately preceding verifier's "
+            r"verdict or output alone is not new evidence.*"
+            r"tracked and staged diff.*untracked input paths plus content.*"
+            r"input submodule's HEAD plus recursive working-tree content.*"
+            r"artifact is explicitly the sole deliverable.*"
+            r"Never reverify the same complete identity.*"
+            r"`PAUSED_VERIFICATION`.*"
+            r"blocking P2 counts against that shared budget.*"
+            r"P3/P4 get no dedicated loop",
+        )
+        self.assertIn("introduced P2 regression remains blocking", policy)
+        self.assertIn("headless likely-long run without an explicit mode", policy)
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):

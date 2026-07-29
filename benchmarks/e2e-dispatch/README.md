@@ -62,7 +62,8 @@ latency benchmark.
 
 The original v1.0.3 record ran before Claude compatibility isolation was added
 and is retained in the research report only as contaminated historical
-evidence. The accepted v1.0.5 `results.json` is case-complete run set
+evidence. The recorded v1.0.5 `results.json` is previous-release evidence, not
+acceptance for the current policy. It is case-complete run set
 `f3a7a889-31b1-4aa0-9052-021a312d8014`: all six cases passed in 765.124
 seconds of aggregate case time with `$1.205134` in client cost fields, after
 both persistent and per-process isolation gates passed. The component run IDs

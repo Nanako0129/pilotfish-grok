@@ -43,7 +43,7 @@ flowchart LR
 | `security-reviewer` | Plan / Approval | `read-only` | high | Pre-approval security evidence |
 | `mech-executor` | Execution | `all` | low | Complete mechanical specs |
 | `executor` | Execution | `all` | medium | Local design judgment |
-| `verifier` | Verification | `execute` | medium | `CONFIRMED` / `REFUTED` |
+| `verifier` | Verification | `execute` | medium | `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
 | `security-executor` | Execution | `all` | high | Approved security implementation |
 
 Pilotfish's uppercase `Explore` role is deliberately absent. That name exists
@@ -70,6 +70,16 @@ Claude Pilotfish lets the verifier run Bash while denying Write tools. Grok's
 `read-only` capability mode also denies shell. Outcome verification needs tests
 and flow reproduction, so the Grok mapping is `execute` (read + shell, no file
 edits).
+
+The verifier receives an exact claim and acceptance and reports calibrated
+evidence, not finding volume. `REFUTED` needs a reproducible P0-P2 blocker and
+takes precedence over missing evidence for another condition. Without such a
+blocker, any unevaluated required condition produces `INCONCLUSIVE` with a
+retry condition. P3/P4 remain advisory. The main session independently
+adjudicates reproducibility, scope, claim relevance, priority, and confidence.
+Regressions caused by the reviewed implementation remain claim-relevant even
+when the brief omitted the affected flow. P0 freezes the slice, and introduced
+P2 regressions must be fixed or paused rather than hidden by a narrowed claim.
 
 ### Capability enforcement order
 
@@ -119,6 +129,23 @@ slices; shared constraints and prerequisites still gate dependent work.
 For non-security-sensitive work, a single unknown bug should not become a
 sequential `scout` → `executor` pipeline when diagnosis, patch design, and live
 verification share one evidence chain.
+
+Long autonomous work uses orchestration labels `AUTO` or `ASK`; neither toggles
+Grok's `/auto` or permission mode. `AUTO` grants only approved reversible work
+and bounded P2 adjudication, never new VCS, publish, install, credential,
+destructive, external, scope, or spend authority. `ASK` uses a native question
+tool only when the current session exposes one; otherwise the turn ends
+`PAUSED_NEEDS_USER`, and headless execution exits without polling or guessing.
+P0 freezes the affected dependency chain. Every verification run shares five
+materially changed P1/P2 fix/reverify passes (1-2 normal, 3-5 recovery) before
+`PAUSED_VERIFICATION`. Verification identity includes the complete tested
+candidate, claim, acceptance, contract, external evidence or prerequisites, and
+environment; a prior verifier's own output is not a change. The candidate
+fingerprint covers committed head, tracked and staged diff, untracked input
+paths plus content, and dirty submodule content. Artifact digests complement
+source identity unless the artifact is the sole deliverable. P2 waits for the
+next coherent boundary, P3/P4 get no dedicated loop, and `INCONCLUSIVE` gets one
+retry after a material change.
 
 ## Deliberately left out
 

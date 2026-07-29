@@ -1,5 +1,5 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.5 -->
+<!-- pilotfish-grok v1.0.6 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
@@ -84,7 +84,7 @@ Complete small, local, already-stable work directly.
 | `security-reviewer` | Pre-approval read-only security evidence |
 | `mech-executor` | Fully specified mechanical implementation |
 | `executor` | Bounded implementation requiring local judgment |
-| `verifier` | Completed-work challenge; `CONFIRMED` or `REFUTED` |
+| `verifier` | Calibrated completed-work challenge; `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE` |
 | `security-executor` | Approved security-sensitive implementation |
 
 There is no installed `Explore` role. Use `scout` for discovery. Grok's built-in
@@ -100,7 +100,7 @@ this lifecycle:
 | Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, a program envelope, and independent slices. | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
 | Approval | `READY` for the envelope and current slice unlocks `exit_plan_mode` to present that scope and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
-| Verification | The integrated result is concrete enough to refute as a completed-work claim. | A fresh `verifier` returns only `CONFIRMED` or `REFUTED`. |
+| Verification | The integrated result has an exact claim and acceptance concrete enough to test. | A fresh `verifier` returns only `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. |
 
 ### Dispatch
 
@@ -171,12 +171,76 @@ can run them with `run_terminal_command` (`background: true` when needed) and
 re-task the leaf with the captured result.
 
 Never swap `plan-verifier` and `verifier`. The former challenges Plan readiness
-with `READY` / `REVISE`; the latter reproduces tests and challenges a
-completed-work claim with `CONFIRMED` / `REFUTED`. Neither role writes the Plan
-or fixes findings. After a concrete `REFUTED`, materially fix the same claim
-before using a fresh verifier. After two consecutive `REFUTED` verdicts for
-that claim, stop automatic fix-and-reverify cycling and surface the failures
-and options to the user; the cap is not `CONFIRMED`, and user-directed
-continuation remains allowed. Do not reverify a substantially unchanged
-implementation. Final judgment remains in the main session.
+with `READY` / `REVISE`; the latter independently tests an exact
+completed-work claim and acceptance with `CONFIRMED` / `REFUTED` /
+`INCONCLUSIVE`. Neither role writes the Plan or fixes findings.
+
+### Verification adjudication
+
+Final judgment remains in the main session. Re-evaluate every verifier result
+for reproducibility, whether it was introduced and is in scope, exact-claim
+relevance, severity/priority, and confidence. A P0/P1 label requires reproducible
+evidence of both severity and exact-claim relevance. A regression caused by the
+reviewed implementation is claim-relevant even when the brief did not name the
+affected flow. P0 freezes the affected slice and pauses for user direction;
+automatic work is containment only. Fix P1 within approved scope or pause and
+ask. An introduced P2 regression remains blocking and must be fixed within
+approved scope or paused; fix other P2 findings only when bounded, inside
+explicit acceptance, and inside approved scope, otherwise defer them with
+rationale and narrow the final claim when needed. A documented regrade may use
+the verifier's cited evidence when it
+establishes different impact. Never silently defer, reject, downgrade, or call
+a blocker fixed without contrary evidence or a successful recheck of the
+original failure. P3/P4 are non-blocking advisories: report or defer them, with
+no dedicated fix/reverify loop.
+`INCONCLUSIVE` gets one retry only after evidence, prerequisites, contract, or
+environment materially changes; otherwise pause the affected slice.
+
+### Verification recovery and long autonomous runs
+
+The recovery budget and severity rules below apply to every verification run;
+`AUTO`/`ASK` clauses apply only to likely long autonomous work.
+
+Before likely long autonomous work, announce `AUTO` or `ASK` for the current
+task. Sleeping, eating, or leaving the agent alone grants no authority. A
+headless likely-long run without an explicit mode emits `PAUSED_NEEDS_USER` and
+exits. Explicitly asking it to continue while the user is away selects `AUTO`
+and must be announced. `/goal` preserves only the objective. These uppercase
+orchestration labels do not toggle Grok's `/auto` or permission mode.
+
+`AUTO` permits only approved-scope reversible work and main-session P2
+adjudication. It grants no version-control action (commit, push, pull request,
+or merge), publish/release/install, credential, destructive/irreversible,
+external-mutation, scope-expansion, or spend authority; separately granted
+authority remains valid.
+
+For `ASK`, use a native user-input or question tool only when one is actually
+exposed in the current Grok session. Otherwise end the turn with
+`PAUSED_NEEDS_USER`, one concise question, choices, and a recommended choice.
+Headless execution emits that pause and exits; never poll, retry, guess, or
+continue the affected slice. Only the main session asks, never a child.
+
+A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
+Blocking P1/P2 recovery shares at most five materially changed fix/reverify
+passes: passes 1-2 are normal and 3-5 are recovery. Each pass needs a material
+change to candidate, claim, acceptance, contract, external evidence or
+prerequisites, or environment; the immediately preceding verifier's verdict or
+output alone is not new evidence. Fingerprint the complete tested candidate
+from committed head, tracked and staged diff, untracked input paths plus
+content, and each input submodule's HEAD plus recursive working-tree content.
+Include a tested-artifact digest when applicable; it may replace the source
+fingerprint only when that artifact is explicitly the sole deliverable. Never
+reverify the same complete identity. After five failed passes, mark the slice
+`PAUSED_VERIFICATION`, block dependents, and continue unrelated safe approved
+slices only when the risk is not cross-cutting. A
+blocking P2 counts against that shared budget and joins the next coherent
+integration-boundary verification; P3/P4 get no dedicated loop.
+
+Stop the whole run only for a cross-cutting blocker, all remaining work
+depending on a paused slice, new authority or product decision,
+destructive/irreversible/external action, exhausted budget or quota, unsafe
+environment, or unattainable original scope. The final report separates
+confirmed, fixed, deferred, regraded or rejected, paused slices and dependents,
+inconclusive or unrun checks, narrowed claims, tests and gates, cost, and
+external actions not taken.
 <!-- pilotfish-grok:end -->

@@ -71,7 +71,7 @@ flowchart LR
 | `security-reviewer` | read-only | high | 批准前資安證據 |
 | `mech-executor` | all | low | 完整規格的機械工作 |
 | `executor` | all | medium | 需要判斷的功能與修復 |
-| `verifier` | execute | medium | 結果挑戰；`CONFIRMED` / `REFUTED` |
+| `verifier` | execute | medium | 校準式結果驗證；`CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
 | `security-executor` | all | high | 已批准的資安實作 |
 
 > **不安裝 Claude 專用的 `Explore` 覆寫。** Pilotfish 用該名 shadow Claude Code 內建 agent；Grok 不需要。discovery 由 `scout` 負責。內建 `explore` 仍可用。
@@ -99,7 +99,7 @@ flowchart TD
     M --> V["verifier<br/>execute · effort medium"]
     E --> V
     SEC --> V
-    V -->|CONFIRMED / REFUTED| O
+    V -->|CONFIRMED / REFUTED / INCONCLUSIVE| O
 ```
 
 ### 委派原則
@@ -132,6 +132,7 @@ flowchart LR
     E --> V[Verification]
     V -->|REFUTED| E
     V -->|CONFIRMED| Done[完成]
+    V -->|INCONCLUSIVE| Pause[暫停或一次實質變更後重試]
 ```
 
 | 階段 | 閘門 | 可委派 |
@@ -140,9 +141,15 @@ flowchart LR
 | **Plan** | Program envelope 加上獨立 slices | 強制 fresh read-only `plan-verifier` 先審 envelope，再審下一個可執行 slice |
 | **Approval** | `READY` 才能 `exit_plan_mode`；使用者批准已驗證 Plan | 僅唯讀；尚不送 implementation brief |
 | **Execution** | 穩定 contract、獨佔 ownership、done criteria | `mech-executor` / `executor` / `security-executor` |
-| **Verification** | 可被推翻的完成宣稱 | fresh `verifier` → `CONFIRMED` / `REFUTED` |
+| **Verification** | 可測試的精確宣稱與 acceptance | fresh `verifier` → `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
 
 對非資安敏感工作，單一未知 bug 的診斷、第一次修復與現場驗證若共用同一條證據鏈，留在主 session——不要拆成 `scout` → `executor` 管線。
+
+只有可重現且阻擋精確宣稱的 P0-P2 finding 才能產生 `REFUTED`；P3/P4
+僅為 advisory，證據不足則為 `INCONCLUSIVE`。長時間工作會宣告
+orchestration `AUTO` 或 `ASK`：`AUTO` 不新增任何權限，若沒有原生提問
+工具，`ASK` 會暫停，而阻擋性的 P1/P2 共用五次實質變更 pass。完整判定與
+復原 contract 請見[設計文件](docs/design.md#phase-aware-orchestration)。
 
 ## 安裝
 
@@ -151,7 +158,7 @@ flowchart LR
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
