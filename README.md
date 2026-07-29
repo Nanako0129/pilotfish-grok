@@ -169,8 +169,8 @@ not turn that into a sequential `scout` → `executor` pipeline.
 Only reproducible P0-P2 blockers to the exact claim can produce `REFUTED`;
 P3/P4 are advisories, while insufficient evidence produces `INCONCLUSIVE`.
 Long work announces orchestration `AUTO` or `ASK`: `AUTO` adds no authority,
-`ASK` pauses when no native question tool is exposed, and a P1 slice pauses
-after five materially changed passes. See [the design](docs/design.md#phase-aware-orchestration)
+`ASK` pauses when no native question tool is exposed, and blocking P1/P2 shares
+five materially changed passes. See [the design](docs/design.md#phase-aware-orchestration)
 for the full adjudication and recovery contract.
 
 ## Install
@@ -180,7 +180,7 @@ for the full adjudication and recovery contract.
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

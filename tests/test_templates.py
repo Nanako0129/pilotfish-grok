@@ -95,6 +95,10 @@ class TemplateContractTests(unittest.TestCase):
             normalized,
             r"REFUTED.*at least one reproducible P0-P2 finding",
         )
+        self.assertIn(
+            "Regressions caused by the reviewed implementation are claim-relevant",
+            normalized,
+        )
         self.assertRegex(
             normalized,
             r"Priority P0-P4.*Confidence.*Evidence.*Expected.*Actual.*Recheck",

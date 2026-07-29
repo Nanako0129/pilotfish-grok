@@ -1,5 +1,5 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.5 -->
+<!-- pilotfish-grok v1.0.6 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
@@ -180,7 +180,9 @@ completed-work claim and acceptance with `CONFIRMED` / `REFUTED` /
 Final judgment remains in the main session. Re-evaluate every verifier result
 for reproducibility, whether it was introduced and is in scope, exact-claim
 relevance, severity/priority, and confidence. A P0/P1 label requires reproducible
-evidence of both severity and exact-claim relevance. Fix an in-scope P0/P1 or
+evidence of both severity and exact-claim relevance. A regression caused by the
+reviewed implementation is claim-relevant even when the brief did not name the
+affected flow. Fix an in-scope P0/P1 or
 pause and ask; never silently defer, reject, downgrade, or call it fixed without
 contrary evidence or a successful recheck of the original failure. Fix a P2
 when it is bounded and inside explicit acceptance; otherwise defer it with
@@ -210,12 +212,15 @@ Headless execution emits that pause and exits; never poll, retry, guess, or
 continue the affected slice. Only the main session asks, never a child.
 
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
-For P1, allow at most five materially changed fix/reverify passes per stable
-slice and claim: passes 1-2 are normal and 3-5 are recovery. Never reverify the
-same implementation head, claim, and environment. After five failed passes,
-mark the slice `PAUSED_VERIFICATION`, block dependents, and continue unrelated
-safe approved slices only when the risk is not cross-cutting. P2 joins the next
-coherent integration-boundary verification; P3/P4 get no dedicated loop.
+Blocking P1/P2 recovery shares at most five materially changed fix/reverify
+passes per stable slice and claim: passes 1-2 are normal and 3-5 are recovery.
+Track a candidate-state fingerprint containing the committed head plus
+working-tree diff or tested-artifact digest; never reverify the same
+fingerprint, claim, and environment. After five failed passes, mark the slice
+`PAUSED_VERIFICATION`, block dependents, and continue unrelated safe approved
+slices only when the risk is not cross-cutting. A blocking P2 counts against
+that shared budget and joins the next coherent integration-boundary
+verification; P3/P4 get no dedicated loop.
 
 Stop the whole run only for a cross-cutting blocker, all remaining work
 depending on a paused slice, new authority or product decision,

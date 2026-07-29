@@ -167,11 +167,12 @@ class PolicyTests(unittest.TestCase):
         self.assertRegex(
             policy,
             r"P0 freezes its slice and dependents.*"
-            r"at most five materially changed fix/reverify passes.*"
+            r"Blocking P1/P2 recovery shares at most five materially changed "
+            r"fix/reverify passes.*"
             r"passes 1-2 are normal and 3-5 are recovery.*"
-            r"same implementation head, claim, and environment.*"
+            r"candidate-state fingerprint.*same fingerprint, claim, and environment.*"
             r"`PAUSED_VERIFICATION`.*"
-            r"P2 joins the next coherent integration-boundary verification.*"
+            r"blocking P2 counts against that shared budget.*"
             r"P3/P4 get no dedicated loop",
         )
 

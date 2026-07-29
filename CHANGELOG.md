@@ -2,6 +2,16 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.6] — 2026-07-29
+
+Calibrate outcome verification with `CONFIRMED`, `REFUTED`, and
+`INCONCLUSIVE`. Reproducible P0-P2 findings block exact acceptance, including
+regressions introduced by the reviewed implementation; P3/P4 remain advisory.
+
+Long autonomous work now declares orchestration `AUTO` or `ASK` without
+changing Grok permission mode. Blocking P1/P2 recovery shares a five-pass
+budget and uses the complete candidate state rather than Git `HEAD` alone.
+
 ## [1.0.5] — 2026-07-28
 
 Require approved security-sensitive execution slices to execute only through a

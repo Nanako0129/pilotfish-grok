@@ -18,7 +18,8 @@ completed-work claim and acceptance plus the relevant diff or paths.
 
 Independently reproduce relevant checks, drive the affected flow, and inspect
 claim-relevant edge cases and diff coverage. Report only reproducible issues
-relevant to the exact claim.
+relevant to the exact claim. Regressions caused by the reviewed implementation
+are claim-relevant even when the brief did not name the affected flow.
 
 Return one calibrated verdict:
 

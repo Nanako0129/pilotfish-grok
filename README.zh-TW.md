@@ -148,7 +148,7 @@ flowchart LR
 只有可重現且阻擋精確宣稱的 P0-P2 finding 才能產生 `REFUTED`；P3/P4
 僅為 advisory，證據不足則為 `INCONCLUSIVE`。長時間工作會宣告
 orchestration `AUTO` 或 `ASK`：`AUTO` 不新增任何權限，若沒有原生提問
-工具，`ASK` 會暫停，而 P1 slice 在五次實質變更 pass 後暫停。完整判定與
+工具，`ASK` 會暫停，而阻擋性的 P1/P2 共用五次實質變更 pass。完整判定與
 復原 contract 請見[設計文件](docs/design.md#phase-aware-orchestration)。
 
 ## 安裝
@@ -158,7 +158,7 @@ orchestration `AUTO` 或 `ASK`：`AUTO` 不新增任何權限，若沒有原生�
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.5 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```

@@ -76,6 +76,8 @@ evidence, not finding volume. `REFUTED` needs a reproducible P0-P2 blocker;
 P3/P4 remain advisory. Unsafe or insufficient evidence produces
 `INCONCLUSIVE` with a retry condition. The main session independently
 adjudicates reproducibility, scope, claim relevance, priority, and confidence.
+Regressions caused by the reviewed implementation remain claim-relevant even
+when the brief omitted the affected flow.
 
 ### Capability enforcement order
 
@@ -132,10 +134,12 @@ and bounded P2 adjudication, never new VCS, publish, install, credential,
 destructive, external, scope, or spend authority. `ASK` uses a native question
 tool only when the current session exposes one; otherwise the turn ends
 `PAUSED_NEEDS_USER`, and headless execution exits without polling or guessing.
-P0 freezes the affected dependency chain. P1 is capped at five materially
-changed fix/reverify passes (1-2 normal, 3-5 recovery) before
-`PAUSED_VERIFICATION`; P2 waits for the next coherent boundary, P3/P4 get no
-dedicated loop, and `INCONCLUSIVE` gets one retry after a material change.
+P0 freezes the affected dependency chain. Blocking P1/P2 recovery shares five
+materially changed fix/reverify passes (1-2 normal, 3-5 recovery) before
+`PAUSED_VERIFICATION`; candidate identity includes committed head plus
+working-tree diff or tested-artifact digest. P2 waits for the next coherent
+boundary, P3/P4 get no dedicated loop, and `INCONCLUSIVE` gets one retry after
+a material change.
 
 ## Deliberately left out
 
