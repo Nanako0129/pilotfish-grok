@@ -36,6 +36,31 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("spawn_subagent", policy)
         self.assertIn("background: true", policy)
 
+    def test_clear_cue_free_work_defaults_to_matching_roles(self) -> None:
+        policy = POLICY.read_text(encoding="utf-8")
+        dispatch = " ".join(policy[policy.index("### Dispatch") :].split())
+
+        self.assertIn("even when the user does not mention agents", dispatch)
+        self.assertIn(
+            "MUST spawn `scout` before repository search for an unknown file or symbol",
+            dispatch,
+        )
+        self.assertIn("exact-text lookup whose file path is unknown", dispatch)
+        self.assertIn(
+            "MUST spawn `mech-executor` before fully specified multi-file mechanical work",
+            dispatch,
+        )
+        self.assertIn(
+            "MUST spawn `executor` before bounded non-security implementation requiring "
+            "local judgment",
+            dispatch,
+        )
+        self.assertIn(
+            "must not silently convert it to main-session work",
+            dispatch,
+        )
+        self.assertIn("Other delegation remains optional", dispatch)
+
     def test_non_negotiable_native_plan_gate_precedes_orchestration_policy(self) -> None:
         policy = POLICY.read_text(encoding="utf-8")
         gate = "### Non-negotiable native Plan gate"
