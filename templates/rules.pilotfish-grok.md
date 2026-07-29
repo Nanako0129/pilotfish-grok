@@ -215,14 +215,16 @@ continue the affected slice. Only the main session asks, never a child.
 
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
 Blocking P1/P2 recovery shares at most five materially changed fix/reverify
-passes per stable slice, claim, and acceptance: passes 1-2 are normal and 3-5 are recovery.
-Track a candidate-state fingerprint containing the committed head plus
-working-tree diff or tested-artifact digest; never reverify the same
-fingerprint, claim, acceptance, and environment. After five failed passes, mark the slice
-`PAUSED_VERIFICATION`, block dependents, and continue unrelated safe approved
-slices only when the risk is not cross-cutting. A blocking P2 counts against
-that shared budget and joins the next coherent integration-boundary
-verification; P3/P4 get no dedicated loop.
+passes: passes 1-2 are normal and 3-5 are recovery. Each pass needs a material
+change to the stable verification identity: candidate, claim, acceptance,
+contract, available evidence or prerequisites, or environment. Fingerprint the
+complete tested candidate from committed head, tracked and staged diff, and
+untracked input paths plus content; a tested-artifact digest may replace that
+input fingerprint. Never reverify the same complete identity. After five failed
+passes, mark the slice `PAUSED_VERIFICATION`, block dependents, and continue
+unrelated safe approved slices only when the risk is not cross-cutting. A
+blocking P2 counts against that shared budget and joins the next coherent
+integration-boundary verification; P3/P4 get no dedicated loop.
 
 Stop the whole run only for a cross-cutting blocker, all remaining work
 depending on a paused slice, new authority or product decision,

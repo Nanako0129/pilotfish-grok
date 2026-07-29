@@ -100,7 +100,15 @@ class TemplateContractTests(unittest.TestCase):
             normalized,
         )
         self.assertIn("For every finding or advisory under any verdict", normalized)
-        self.assertIn("any reproducible high-impact user/system failure", normalized)
+        self.assertIn(
+            "any reproducible high-impact user/system failure that does not meet P0",
+            normalized,
+        )
+        self.assertIn(
+            "sufficient for every required acceptance condition",
+            normalized,
+        )
+        self.assertIn("List each condition checked and its evidence/result", normalized)
         self.assertRegex(
             normalized,
             r"Priority P0-P4.*Confidence.*Evidence.*Expected.*Actual.*Recheck",

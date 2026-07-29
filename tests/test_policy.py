@@ -172,7 +172,9 @@ class PolicyTests(unittest.TestCase):
             r"Blocking P1/P2 recovery shares at most five materially changed "
             r"fix/reverify passes.*"
             r"passes 1-2 are normal and 3-5 are recovery.*"
-            r"candidate-state fingerprint.*same fingerprint, claim, acceptance, and environment.*"
+            r"stable verification identity.*available evidence or prerequisites.*"
+            r"tracked and staged diff.*untracked input paths plus content.*"
+            r"Never reverify the same complete identity.*"
             r"`PAUSED_VERIFICATION`.*"
             r"blocking P2 counts against that shared budget.*"
             r"P3/P4 get no dedicated loop",

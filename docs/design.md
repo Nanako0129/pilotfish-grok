@@ -137,10 +137,12 @@ tool only when the current session exposes one; otherwise the turn ends
 `PAUSED_NEEDS_USER`, and headless execution exits without polling or guessing.
 P0 freezes the affected dependency chain. Blocking P1/P2 recovery shares five
 materially changed fix/reverify passes (1-2 normal, 3-5 recovery) before
-`PAUSED_VERIFICATION`; candidate identity includes committed head plus
-working-tree diff or tested-artifact digest, while verification identity also
-includes acceptance. P2 waits for the next coherent boundary, P3/P4 get no
-dedicated loop, and `INCONCLUSIVE` gets one retry after a material change.
+`PAUSED_VERIFICATION`. Verification identity includes the complete tested
+candidate, claim, acceptance, contract, available evidence or prerequisites,
+and environment. The candidate fingerprint covers committed head, tracked and
+staged diff, and untracked input paths plus content, or a tested-artifact
+digest. P2 waits for the next coherent boundary, P3/P4 get no dedicated loop,
+and `INCONCLUSIVE` gets one retry after a material change.
 
 ## Deliberately left out
 
