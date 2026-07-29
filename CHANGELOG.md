@@ -12,6 +12,12 @@ Long autonomous work now declares orchestration `AUTO` or `ASK` without
 changing Grok permission mode. Blocking P1/P2 recovery shares a five-pass
 budget and uses the complete candidate state rather than Git `HEAD` alone.
 
+Require cue-free routing for clear delegated work: unknown-path repository
+discovery starts with `scout`, fully specified multi-file edits use
+`mech-executor`, and bounded non-security implementation requiring judgment
+uses `executor`. Trivial direct work and the single-unknown-bug exception remain
+unchanged.
+
 ## [1.0.5] — 2026-07-28
 
 Require approved security-sensitive execution slices to execute only through a
