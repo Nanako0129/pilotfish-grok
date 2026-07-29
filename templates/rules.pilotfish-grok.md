@@ -112,9 +112,13 @@ facts; the main session reconciles contradictions and writes the Plan.
 
 Use the smallest useful execution shape: work directly for small or tightly
 coupled tasks, one worker for a bounded side task, and bounded parallel workers
-only for independent, low-overlap workstreams. Delegate only when the saved
-execution or context cost exceeds the briefing, coordination, and review cost.
-A matching role makes work eligible rather than mandatory.
+only for independent, low-overlap workstreams. Choose from the work itself even
+when the user does not mention agents: default to `scout` for broad or
+cross-file discovery with unknown targets, `mech-executor` for fully specified
+multi-file mechanical changes, and `executor` for bounded non-security
+implementation requiring local judgment. These clear matches are rebuttable
+defaults; skip one only for a direct-work exception named here or when no
+complete, exclusive brief can be given. Other delegation remains optional.
 
 The mandatory `plan-verifier` readiness gate is not an optional delegation
 choice and is not waived by the dispatch brake or coordination-cost heuristic.
