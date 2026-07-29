@@ -78,12 +78,43 @@ class TemplateContractTests(unittest.TestCase):
 
         self.assertIn("CONFIRMED", outcome)
         self.assertIn("REFUTED", outcome)
+        self.assertIn("INCONCLUSIVE", outcome)
         self.assertNotIn("READY", outcome)
         self.assertNotIn("REVISE", outcome)
 
         self.assertIn("security-executor", security_review)
         self.assertIn("security-reviewer", security_execute)
         self.assertIn("pre-approval", security_review.lower())
+
+    def test_verifier_contract_is_calibrated_and_structured(self) -> None:
+        outcome = (AGENTS_DIR / "verifier.md").read_text(encoding="utf-8")
+        normalized = " ".join(outcome.split())
+
+        self.assertIn("exact completed-work claim and acceptance", normalized)
+        self.assertRegex(
+            normalized,
+            r"REFUTED.*at least one reproducible P0-P2 finding",
+        )
+        self.assertRegex(
+            normalized,
+            r"Priority P0-P4.*Confidence.*Evidence.*Expected.*Actual.*Recheck",
+        )
+        self.assertIn(
+            "P3/P4 are non-blocking advisories and cannot by themselves produce REFUTED",
+            normalized,
+        )
+        self.assertRegex(
+            normalized,
+            r"INCONCLUSIVE.*reason, missing evidence, and retry condition",
+        )
+        self.assertRegex(
+            normalized,
+            r"Priority measures real user/system impact.*"
+            r"failed acceptance that is bounded/recoverable is P2 unless it "
+            r"independently meets P0 or high-impact P1 criteria",
+        )
+        self.assertNotIn("assume it is broken", outcome)
+        self.assertNotIn("Do not trust", outcome)
 
     def test_bash_capable_roles_use_exact_context_handoff(self) -> None:
         for role in (
@@ -182,6 +213,7 @@ class TemplateContractTests(unittest.TestCase):
 
         self.assertIn("enter_plan_mode", readme)
         self.assertIn("Mandatory fresh read-only `plan-verifier`", readme)
+        self.assertIn("INCONCLUSIVE", readme)
 
     def test_design_explains_grok_adaptation_boundary(self) -> None:
         design = (ROOT / "docs" / "design.md").read_text(encoding="utf-8")

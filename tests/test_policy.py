@@ -138,15 +138,42 @@ class PolicyTests(unittest.TestCase):
             "If an affected ID changes or is added, repeat security review",
         ):
             self.assertIn(phrase, policy)
-        for phrase in (
-            "two consecutive `REFUTED` verdicts",
-            "fix the same claim",
-            "stop automatic fix-and-reverify cycling",
-            "the cap is not `CONFIRMED`",
-            "user-directed continuation remains allowed",
-            "substantially unchanged implementation",
-        ):
-            self.assertIn(phrase, " ".join(policy.split()))
+
+    def test_calibrated_adjudication_and_bounded_long_run_policy(self) -> None:
+        policy = " ".join(POLICY.read_text(encoding="utf-8").split())
+
+        self.assertIn("`CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`", policy)
+        self.assertRegex(
+            policy,
+            r"P0/P1 label requires reproducible evidence.*"
+            r"P2 when it is bounded.*P3/P4 are non-blocking advisories.*"
+            r"`INCONCLUSIVE` gets one retry only",
+        )
+        self.assertRegex(
+            policy,
+            r"announce `AUTO` or `ASK`.*"
+            r"do not toggle Grok's `/auto` or permission mode",
+        )
+        self.assertRegex(
+            policy,
+            r"`AUTO` permits only approved-scope reversible work.*"
+            r"no version-control action.*external-mutation.*spend authority",
+        )
+        self.assertRegex(
+            policy,
+            r"`PAUSED_NEEDS_USER`.*Headless execution emits that pause and exits.*"
+            r"Only the main session asks, never a child",
+        )
+        self.assertRegex(
+            policy,
+            r"P0 freezes its slice and dependents.*"
+            r"at most five materially changed fix/reverify passes.*"
+            r"passes 1-2 are normal and 3-5 are recovery.*"
+            r"same implementation head, claim, and environment.*"
+            r"`PAUSED_VERIFICATION`.*"
+            r"P2 joins the next coherent integration-boundary verification.*"
+            r"P3/P4 get no dedicated loop",
+        )
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):
