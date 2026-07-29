@@ -41,16 +41,24 @@ class PolicyTests(unittest.TestCase):
         dispatch = " ".join(policy[policy.index("### Dispatch") :].split())
 
         self.assertIn("even when the user does not mention agents", dispatch)
-        self.assertIn("default to `scout` for broad or cross-file discovery", dispatch)
         self.assertIn(
-            "`mech-executor` for fully specified multi-file mechanical changes",
+            "MUST spawn `scout` before repository search for an unknown file or symbol",
+            dispatch,
+        )
+        self.assertIn("exact-text lookup whose file path is unknown", dispatch)
+        self.assertIn(
+            "MUST spawn `mech-executor` before fully specified multi-file mechanical work",
             dispatch,
         )
         self.assertIn(
-            "`executor` for bounded non-security implementation requiring local judgment",
+            "MUST spawn `executor` before bounded non-security implementation requiring "
+            "local judgment",
             dispatch,
         )
-        self.assertIn("These clear matches are rebuttable defaults", dispatch)
+        self.assertIn(
+            "must not silently convert it to main-session work",
+            dispatch,
+        )
         self.assertIn("Other delegation remains optional", dispatch)
 
     def test_non_negotiable_native_plan_gate_precedes_orchestration_policy(self) -> None:

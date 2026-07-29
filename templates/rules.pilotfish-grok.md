@@ -112,13 +112,20 @@ facts; the main session reconciles contradictions and writes the Plan.
 
 Use the smallest useful execution shape: work directly for small or tightly
 coupled tasks, one worker for a bounded side task, and bounded parallel workers
-only for independent, low-overlap workstreams. Choose from the work itself even
-when the user does not mention agents: default to `scout` for broad or
-cross-file discovery with unknown targets, `mech-executor` for fully specified
-multi-file mechanical changes, and `executor` for bounded non-security
-implementation requiring local judgment. These clear matches are rebuttable
-defaults; skip one only for a direct-work exception named here or when no
-complete, exclusive brief can be given. Other delegation remains optional.
+only for independent, low-overlap workstreams. Before the main session uses
+repository discovery or implementation tools, apply the first matching rule
+even when the user does not mention agents:
+
+- MUST spawn `scout` before repository search for an unknown file or symbol,
+  including an exact-text lookup whose file path is unknown and broad or
+  cross-file discovery.
+- MUST spawn `mech-executor` before fully specified multi-file mechanical work.
+- MUST spawn `executor` before bounded non-security implementation requiring
+  local judgment.
+
+The direct-work and single-unknown-bug exceptions here still apply. The dispatch
+brake may serialize a matching unit but must not silently convert it to
+main-session work. Other delegation remains optional.
 
 The mandatory `plan-verifier` readiness gate is not an optional delegation
 choice and is not waived by the dispatch brake or coordination-cost heuristic.
