@@ -434,7 +434,7 @@ class E2EDispatchTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "each affected readiness"):
             runner.assert_security_review_before_readiness({"events": events})
 
-    def test_native_plan_gate_stops_after_two_revisions_per_unit(self) -> None:
+    def test_native_plan_gate_allows_one_material_final_readiness_pass(self) -> None:
         runner = load_runner_module()
         events = [{"kind": "tool_call", "sequence": 0, "tool": "enter_plan_mode"}]
         prompt = (
@@ -442,8 +442,24 @@ class E2EDispatchTests(unittest.TestCase):
             "- ID: ENV-test\n"
             "- Kind: program envelope\n"
         )
+        blockers = (
+            "Missing migration acceptance evidence.",
+            "Rollback precondition is undefined.",
+        )
         for index, verdict in enumerate(("REVISE", "REVISE", "READY"), start=1):
             subagent_id = f"pv-{index}"
+            review_prompt = prompt
+            if index == 3:
+                review_prompt += (
+                    "\n## Blocker dispositions\n"
+                    f"- FIX: {blockers[0]}\n"
+                    f"- REJECT: {blockers[1]}\n"
+                    "\n## Final readiness recheck\n"
+                    "- Material change: Added the missing migration acceptance evidence.\n"
+                )
+            output = verdict
+            if verdict == "REVISE":
+                output += f"\nBlocker: {blockers[index - 1]}"
             events.extend(
                 [
                     {
@@ -452,13 +468,13 @@ class E2EDispatchTests(unittest.TestCase):
                         "subagent_type": "plan-verifier",
                         "capability_mode": "read-only",
                         "subagent_id": subagent_id,
-                        "raw_input": {"background": False, "prompt": prompt},
+                        "raw_input": {"background": False, "prompt": review_prompt},
                     },
                     {
                         "kind": "finished",
                         "sequence": index * 2,
                         "subagent_id": subagent_id,
-                        "output": verdict,
+                        "output": output,
                     },
                 ]
             )
@@ -471,7 +487,123 @@ class E2EDispatchTests(unittest.TestCase):
                 '{"state":"Active","awaiting_plan_approval":true}\n',
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(AssertionError, "two-REVISE cap"):
+            gate = runner.assert_native_plan_gate(
+                {"events": events, "session_dir": str(session)}
+            )
+            self.assertEqual(gate["verdicts"], ["REVISE", "REVISE", "READY"])
+            self.assertEqual(
+                gate["final_readiness_material_changes"],
+                ["Added the missing migration acceptance evidence."],
+            )
+            self.assertEqual(
+                [item["status"] for item in gate["final_readiness_dispositions"]],
+                ["FIX", "REJECT"],
+            )
+
+            events[5]["raw_input"]["prompt"] = prompt
+            with self.assertRaisesRegex(AssertionError, "material-change evidence"):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
+            events[5]["raw_input"]["prompt"] = (
+                prompt
+                + "\n## Final readiness recheck\n"
+                "- Material change: Added the missing migration acceptance evidence.\n"
+            )
+            with self.assertRaisesRegex(AssertionError, "dispositions"):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
+            events[2]["output"] = "REVISE\nBlocker: Auth"
+            events[4]["output"] = "REVISE\nBlocker: Authentication"
+            events[5]["raw_input"]["prompt"] = (
+                prompt
+                + "\n## Blocker dispositions\n"
+                "- FIX: Authentication\n"
+                "\n## Final readiness recheck\n"
+                "- Material change: Added authentication evidence.\n"
+            )
+            with self.assertRaisesRegex(AssertionError, "Auth"):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+            events[2]["output"] = f"REVISE\nBlocker: {blockers[0]}"
+            events[4]["output"] = f"REVISE\nBlocker: {blockers[1]}"
+            events[5]["raw_input"]["prompt"] = review_prompt
+            exit_event = events.pop()
+            events.extend(
+                [
+                    {
+                        "kind": "spawned",
+                        "sequence": 7,
+                        "subagent_type": "plan-verifier",
+                        "capability_mode": "read-only",
+                        "subagent_id": "pv-4",
+                        "raw_input": {
+                            "background": False,
+                            "prompt": review_prompt,
+                        },
+                    },
+                    {
+                        "kind": "finished",
+                        "sequence": 8,
+                        "subagent_id": "pv-4",
+                        "output": "READY",
+                    },
+                    {**exit_event, "sequence": 9},
+                ]
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "bounded final readiness pass"
+            ):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
+            ready_events = [
+                {"kind": "tool_call", "sequence": 0, "tool": "enter_plan_mode"}
+            ]
+            for index in range(1, 5):
+                ready_events.extend(
+                    [
+                        {
+                            "kind": "spawned",
+                            "sequence": index * 2 - 1,
+                            "subagent_type": "plan-verifier",
+                            "capability_mode": "read-only",
+                            "subagent_id": f"ready-{index}",
+                            "raw_input": {"background": False, "prompt": prompt},
+                        },
+                        {
+                            "kind": "finished",
+                            "sequence": index * 2,
+                            "subagent_id": f"ready-{index}",
+                            "output": "READY",
+                        },
+                    ]
+                )
+            ready_events.append(
+                {"kind": "tool_call", "sequence": 9, "tool": "exit_plan_mode"}
+            )
+            gate = runner.assert_native_plan_gate(
+                {"events": ready_events, "session_dir": str(session)}
+            )
+            self.assertEqual(gate["plan_verifier_spawns"], 4)
+
+            fourth_finish = events.pop(-2)
+            with self.assertRaisesRegex(
+                AssertionError, "bounded final readiness pass"
+            ):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
+            events.append({**fourth_finish, "sequence": 10})
+            with self.assertRaisesRegex(
+                AssertionError, "bounded final readiness pass"
+            ):
                 runner.assert_native_plan_gate(
                     {"events": events, "session_dir": str(session)}
                 )

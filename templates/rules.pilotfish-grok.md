@@ -1,21 +1,34 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.6 -->
+<!-- pilotfish-grok v1.0.7 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
 
 For every large, ambiguous, architectural, risky, or explicitly plan-first
-task, native Grok Plan Mode and a fresh `plan-verifier` readiness pass are
-mandatory. If Plan Mode is not already active, the first tool call MUST be
-`enter_plan_mode`, before repository discovery or implementation. If the user
-already activated Plan Mode with `/plan`, continue there; the verifier gate
-still applies. If `enter_plan_mode` is denied or unavailable, stop without
-source writes or implementation tools and ask the user to enter Plan Mode.
+task, native Grok Plan Mode is mandatory. A fresh `plan-verifier` readiness
+pass is additionally required for those tasks when the independent-review trigger below
+applies. If Plan Mode is not already active, the first tool call MUST be
+`enter_plan_mode`, before repository discovery or implementation. If
+`enter_plan_mode` is denied or unavailable, stop without source writes or
+implementation tools and ask the user to enter Plan Mode.
+When the trigger applies, the same readiness contract covers user-initiated
+`/plan` sessions.
+
+Independent review is risk-triggered, not a synonym for non-trivial. Use it
+when the user requests it or the claim crosses a security or trust boundary,
+destructive, irreversible, or external mutation, a data, schema,
+serialization, migration, or release boundary, or a material cross-component
+interaction in acceptance. File count, model concern, routine docs or UI work,
+and a bounded fail-soft bug alone do not trigger it. After implementation and
+approval, a triggered `verifier` must exercise the primary user-visible flow
+against acceptance before adversarial outcome review; this post-implementation
+evidence is not a prerequisite for the pre-approval `plan-verifier`.
 
 Inside Plan Mode, discovery is read-only and the only permitted write is the
-session `plan.md`. The main session must synthesize the complete Plan, then
-spawn a fresh `plan-verifier` with `background: false`, the exact target
-readiness-unit ID and kind, the full Plan text, and relevant evidence paths.
+session `plan.md`. The main session must synthesize the complete Plan. When the
+independent-review trigger applies, spawn a fresh `plan-verifier` with
+`background: false`, the exact target readiness-unit ID and kind, the full Plan
+text, and relevant evidence paths.
 Format the target as a `## Target readiness unit` block with `- ID:` and
 `- Kind:` (`program envelope` or `execution slice`). The child must use its
 installed read-only capability and review exactly that unit. `READY` is the bare
@@ -30,28 +43,37 @@ For long or large work, keep shared outcome, non-goals, scope, architecture,
 security, dependencies, integration, budget, and stops in one program envelope.
 Split execution only into genuinely independent slices with stable IDs,
 outcome, scope, non-goals, exclusive owners, prerequisites, acceptance that
-proves the slice outcome, and rollback. Review the envelope first, then only the
-next executable slice. Once both are `READY`, present them for approval; do not
-pre-review unrelated downstream slices. Shared blockers and unmet prerequisites
-still gate dependent work. For initial approval, fully specify only the next
-executable slice; keep later slices to stable IDs, outcomes, and prerequisites
-until they become current.
+proves the slice outcome, and rollback. When review is required, review the
+envelope first, then only the next executable slice. Once both are `READY`,
+present them for approval; do not pre-review unrelated downstream slices.
+Shared blockers and unmet prerequisites still gate dependent work. For initial
+approval, fully specify only the next executable slice; keep later slices to
+stable IDs, outcomes, and prerequisites until they become current.
 
 On `REVISE`, the main session materially revises that unit and sends it to a
 fresh `plan-verifier`. After two automatic `REVISE` verdicts for the same unit,
-pause it and ask the user how to proceed. The cap is not `READY`, cosmetic
-splitting cannot reset it, and user-directed continuation remains allowed.
-Only `READY` verdicts for every required readiness unit—the envelope and
-current slice for large work—permit `exit_plan_mode`, which presents that
-verified scope for user approval. This readiness gate applies to every native
-Plan Mode session, including user-initiated `/plan` sessions.
+stop the automatic loop and independently disposition every blocker as `FIX`,
+`DEFER`, or `REJECT`; simplify, narrow, or split the unit and continue
+independently approvable slices. If a disposition materially changes the
+candidate, scope, or supporting evidence, allow one bounded final readiness
+pass for that same unit to confirm closure; this is not an automatic-loop reset.
+That closing brief must contain a `## Final readiness recheck` block with a
+non-empty `- Material change:` entry naming the candidate, scope, or evidence
+delta, plus a `## Blocker dispositions` block that maps every prior `Blocker:`
+to `FIX`, `DEFER`, or `REJECT`.
+If that pass still returns `REVISE`, stop. Ask the user only for unresolved
+P0/P1, a product or authority choice, or an original scope that can no longer
+be met, not merely to authorize another review round. The cap is not `READY`.
+When review is required, `READY` for the envelope and current slice permits
+`exit_plan_mode`; otherwise the completed Plan may proceed to that native
+approval surface without claiming a verifier verdict.
 
 Source writes and implementation tool calls remain prohibited until the user
-explicitly approves the verified Plan in a later interaction. A broad initial
+explicitly approves the presented Plan in a later interaction. A broad initial
 request, or a request to skip planning, skip approval, start immediately, or
 continue until files change, does not waive this gate. Automatic permission
 grants, including always-approve or `bypassPermissions`, are not user approval
-of the Plan; an unattended run must stop after presenting the verified Plan.
+of the Plan; an unattended run must stop after presenting the Plan.
 
 Every approved security-sensitive execution slice has a mandatory execution
 boundary. Findings from `security-reviewer` on a program envelope remain
@@ -97,10 +119,10 @@ this lifecycle:
 | Phase | Gate | Eligible delegation |
 |---|---|---|
 | Discovery | Enter native Plan Mode first for gated work, then stabilize the question, allowed scope, evidence format, and stop condition with read-only discovery. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
-| Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, a program envelope, and independent slices. | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
-| Approval | `READY` for the envelope and current slice unlocks `exit_plan_mode` to present that scope and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
+| Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, a program envelope, and independent slices. | When the native Plan gate and independent-review trigger both apply, fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
+| Approval | A complete Plan, plus `READY` for every risk-triggered readiness unit, unlocks `exit_plan_mode` to present that scope and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
-| Verification | The integrated result has an exact claim and acceptance concrete enough to test. | A fresh `verifier` returns only `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. |
+| Verification | The integrated result has an exact claim and acceptance concrete enough to test. | When the independent-review trigger applies, a fresh `verifier` returns only `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. |
 
 ### Dispatch
 
@@ -125,10 +147,12 @@ even when the user does not mention agents:
 
 The direct-work and single-unknown-bug exceptions here still apply. The dispatch
 brake may serialize a matching unit but must not silently convert it to
-main-session work. Other delegation remains optional.
-
-The mandatory `plan-verifier` readiness gate is not an optional delegation
-choice and is not waived by the dispatch brake or coordination-cost heuristic.
+main-session work. Other delegation remains optional. When the native Plan gate
+and independent-review trigger both apply, pre-approval `plan-verifier`
+readiness is mandatory. Whenever the independent-review trigger applies,
+post-implementation `verifier` outcome review after primary acceptance is
+mandatory. The dispatch brake and coordination-cost heuristic cannot waive an
+applicable gate.
 
 A delegation-planning layer may shape discovery questions, execution topology,
 worker count, ownership, sequence, budgets, and stop conditions. This policy
@@ -181,16 +205,20 @@ required environment, input paths, and completion criterion so the orchestrator
 can run them with `run_terminal_command` (`background: true` when needed) and
 re-task the leaf with the captured result.
 
-Never swap `plan-verifier` and `verifier`. The former challenges Plan readiness
+Never swap `plan-verifier` and `verifier`. When triggered, the former challenges Plan readiness
 with `READY` / `REVISE`; the latter independently tests an exact
 completed-work claim and acceptance with `CONFIRMED` / `REFUTED` /
 `INCONCLUSIVE`. Neither role writes the Plan or fixes findings.
 
 ### Verification adjudication
 
-Final judgment remains in the main session. Re-evaluate every verifier result
-for reproducibility, whether it was introduced and is in scope, exact-claim
-relevance, severity/priority, and confidence. A P0/P1 label requires reproducible
+Role verdicts are evidence, not implementation or scope authority. Final
+judgment remains in the main session. Before acting on a finding, label it
+`FIX`, `DEFER`, or `REJECT` after checking reproducibility, whether it was
+introduced and is in scope, exact-claim relevance, severity/priority, and
+confidence. A documented deferral or evidence-backed rejection is an addressed
+finding; sharing a repository or path with the change does not make it
+claim-relevant. A P0/P1 label requires reproducible
 evidence of both severity and exact-claim relevance. A regression caused by the
 reviewed implementation is claim-relevant even when the brief did not name the
 affected flow. P0 freezes the affected slice and pauses for user direction;
@@ -200,17 +228,21 @@ approved scope or paused; fix other P2 findings only when bounded, inside
 explicit acceptance, and inside approved scope, otherwise defer them with
 rationale and narrow the final claim when needed. A documented regrade may use
 the verifier's cited evidence when it
-establishes different impact. Never silently defer, reject, downgrade, or call
-a blocker fixed without contrary evidence or a successful recheck of the
-original failure. P3/P4 are non-blocking advisories: report or defer them, with
+establishes different impact. Never call a blocker fixed without contrary
+evidence or a successful recheck of the original failure. P3/P4 are
+non-blocking advisories: report or defer them, with
 no dedicated fix/reverify loop.
 `INCONCLUSIVE` gets one retry only after evidence, prerequisites, contract, or
-environment materially changes; otherwise pause the affected slice.
+environment materially changes; otherwise pause the affected slice. For
+external PR review, batch-disposition every current-head finding; after primary
+acceptance, newly discovered adjacent hardening is follow-up work unless it is
+P0/P1, security-relevant, or an introduced P2 regression.
 
 ### Verification recovery and long autonomous runs
 
-The recovery budget and severity rules below apply to every verification run;
-`AUTO`/`ASK` clauses apply only to likely long autonomous work.
+Severity rules apply to every verification run. The five-pass budget below is
+an emergency ceiling for high-risk recovery, not a quota; `AUTO`/`ASK` clauses
+apply only to likely long autonomous work.
 
 Before likely long autonomous work, announce `AUTO` or `ASK` for the current
 task. Sleeping, eating, or leaving the agent alone grants no authority. A
@@ -232,8 +264,11 @@ Headless execution emits that pause and exits; never poll, retry, guess, or
 continue the affected slice. Only the main session asks, never a child.
 
 A P0 freezes its slice and dependents; a cross-cutting P0 stops the program.
-Blocking P1/P2 recovery shares at most five materially changed fix/reverify
-passes: passes 1-2 are normal and 3-5 are recovery. Each pass needs a material
+Default recovery is one targeted recheck after fixing a reproduced blocker:
+rerun the original reproduction plus a bounded basic regression, not a new
+adjacent-hardening audit. High-risk, claim-critical P1/P2 recovery may use at
+most five materially changed fix/reverify passes; passes 3-5 are emergency
+recovery. Each pass needs a material
 change to candidate, claim, acceptance, contract, external evidence or
 prerequisites, or environment; the immediately preceding verifier's verdict or
 output alone is not new evidence. Fingerprint the complete tested candidate
@@ -241,7 +276,8 @@ from committed head, tracked and staged diff, untracked input paths plus
 content, and each input submodule's HEAD plus recursive working-tree content.
 Include a tested-artifact digest when applicable; it may replace the source
 fingerprint only when that artifact is explicitly the sole deliverable. Never
-reverify the same complete identity. After five failed passes, mark the slice
+reverify the same complete identity. Stop earlier when the next pass would only
+search adjacent risk. After five failed passes, mark the slice
 `PAUSED_VERIFICATION`, block dependents, and continue unrelated safe approved
 slices only when the risk is not cross-cutting. A
 blocking P2 counts against that shared budget and joins the next coherent

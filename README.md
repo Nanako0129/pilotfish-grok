@@ -49,7 +49,7 @@ regime pilotfish-grok still helps by:
 - Protecting main-session context (recon and bulk work run in child sessions)
 - Tiering **reasoning effort** per role (low for recon/mechanical, higher for security)
 - Enforcing **capability modes** (`read-only` / `execute` / `all`) on named roles
-- Requiring fresh `verifier` passes for non-trivial outcomes
+- Requiring fresh `verifier` passes for concrete-risk outcomes
 
 When cheaper models appear in your catalog, pin them in `[subagents.models]`
 without rewriting the policy.
@@ -126,7 +126,11 @@ flowchart TD
 - Spawn named roles with `spawn_subagent`; use `background: true` when independent work can run in parallel.
 - Give writing agents exclusive ownership or `isolation: "worktree"`.
 - Do not override `model` or `capability_mode` on named roles at spawn time.
-- Treat delegated results as evidence. Non-trivial changes get a fresh `verifier` pass.
+- Treat delegated results as evidence. Concrete security, irreversible/external,
+  data, release, or cross-component acceptance risk triggers fresh review;
+  “non-trivial” alone does not. When native Plan Mode and the trigger both
+  apply, pre-approval `plan-verifier` readiness is mandatory; post-implementation
+  `verifier` review after primary acceptance is mandatory whenever triggered.
 - Long-running processes stay main-session owned: leaves return exact command + cwd/worktree + env for handoff.
 
 ## Lifecycle
@@ -134,21 +138,32 @@ flowchart TD
 Large, ambiguous, architectural, risky, or explicitly plan-first work must
 enter native Grok Plan Mode before discovery. Large Plans keep shared
 constraints in a program envelope and split only independent execution slices.
-The envelope and next executable slice receive fresh read-only reviews before
-`exit_plan_mode` presents them for approval. `REVISE` includes blocker,
-evidence, minimum revision, and acceptance check. After two automatic revisions
-for one unit, Grok pauses it for user direction instead of retrying forever.
+Risk-triggered envelope and current-slice reviews happen before
+`exit_plan_mode`; lower-risk Plans still use the native approval surface.
+`REVISE` returns all known P0-P2 blockers in one pass. After two automatic
+revisions, Grok stops the automatic loop and dispositions each blocker as
+`FIX`, `DEFER`, or `REJECT`. A material candidate, scope, or evidence change
+permits one bounded final readiness pass, not an automatic-loop reset; then ask
+only for unresolved high-impact or product and authority decisions. After
+implementation and approval, a triggered outcome review first exercises the
+primary acceptance flow; pre-approval readiness does not substitute for that
+evidence.
 
 ```mermaid
 flowchart LR
     R[Complex request] --> N[enter_plan_mode]
     N --> D[Read-only discovery]
     D --> P[Session plan.md]
-    P --> PV[Fresh plan-verifier]
+    P --> T{Review trigger?}
+    T -->|yes| PV[Fresh plan-verifier]
+    T -->|no| A
     PV -->|REVISE| P
     PV -->|READY| A[exit_plan_mode and approval]
     A --> E[Execution]
-    E --> V[Verification]
+    E --> F[Primary acceptance flow]
+    F --> O{Outcome review triggered?}
+    O -->|yes| V[Fresh verifier]
+    O -->|no| Done
     V -->|REFUTED| E
     V -->|CONFIRMED| Done[Done]
     V -->|INCONCLUSIVE| Pause[Pause or one material retry]
@@ -157,10 +172,10 @@ flowchart LR
 | Phase | Gate | Eligible delegation |
 |---|---|---|
 | **Discovery** | Native Plan Mode active; stable question, scope, evidence format, stop condition | Bounded read-only `scout` on disjoint surfaces |
-| **Plan** | Program envelope plus independent slices | Mandatory fresh read-only `plan-verifier` reviews the envelope, then the next executable slice |
-| **Approval** | `READY` unlocks `exit_plan_mode`; user approves the verified Plan | Read-only only; no implementation brief yet |
+| **Plan** | Program envelope plus independent slices | Risk-triggered fresh read-only `plan-verifier` reviews the envelope, then the next executable slice |
+| **Approval** | Complete Plan, plus `READY` for triggered units, unlocks `exit_plan_mode`; user approves the presented Plan | Read-only only; no implementation brief yet |
 | **Execution** | Stable contract with exclusive ownership and done criteria | `mech-executor` / `executor` / `security-executor` |
-| **Verification** | Exact claim and acceptance to test | Fresh `verifier` → `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
+| **Verification** | Exact claim and acceptance to test | Risk-triggered fresh `verifier` → `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
 
 For non-security-sensitive work, a single unknown bug's diagnosis, first fix,
 and live check stay in the main session when they share one evidence chain—do
@@ -168,10 +183,9 @@ not turn that into a sequential `scout` → `executor` pipeline.
 
 Only reproducible P0-P2 blockers to the exact claim can produce `REFUTED`;
 P3/P4 are advisories, while insufficient evidence produces `INCONCLUSIVE`.
-Long work announces orchestration `AUTO` or `ASK`: `AUTO` adds no authority,
-`ASK` pauses when no native question tool is exposed, and blocking P1/P2 shares
-five materially changed passes. See [the design](docs/design.md#phase-aware-orchestration)
-for the full adjudication and recovery contract.
+Long work announces orchestration `AUTO` or `ASK`: `AUTO` adds no authority and
+`ASK` pauses when no native question tool is exposed. Normal recovery is one
+targeted recheck; five P1/P2 passes remain only a high-risk emergency ceiling.
 
 ## Install
 
@@ -180,7 +194,7 @@ for the full adjudication and recovery contract.
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.7 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -319,10 +333,11 @@ The instruction-surface comparison and approval-gate ablations are documented in
 
 ## Limitations (v1.0)
 
-- Live e2e proves ambient native Plan entry, mandatory Plan readiness review,
-  the adversarial approval-bypass gate, and **forced** role capability
-  application. It does not prove general unprompted role choice outside the
-  mandatory Plan lifecycle.
+- The recorded v1.0.5 live e2e proves ambient native Plan entry, the earlier
+  mandatory Plan-readiness lifecycle, the adversarial approval-bypass gate,
+  and **forced** role capability application for those historical bytes. The
+  v1.0.7 risk-triggered boundary has static and install-only evidence; its live
+  run was blocked before inference by exhausted Grok Build balance.
 - Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.

@@ -99,7 +99,7 @@ subscription savings do not apply. pilotfish-grok still pays for itself by:
 
 - Keeping high-volume recon off the main context window
 - Bounding mechanical work to low reasoning effort
-- Requiring fresh-context verification for non-trivial claims
+- Requiring fresh-context verification for concrete risk, not “non-trivial” alone
 
 When cheaper models appear in the catalog, pin them under `[subagents.models]`
 without editing policy prose.
@@ -110,21 +110,28 @@ Role matching makes work eligible for delegation; it does not make delegation
 mandatory. The main session retains framing, Plan synthesis, architecture,
 ambiguity resolution, integration, and final judgment.
 
-Plan readiness is the deliberate exception to optional role dispatch. For
-large, ambiguous, architectural, risky, or explicitly plan-first work, the
-orchestrator calls `enter_plan_mode` before repository discovery, writes the
-session `plan.md`, and sends the full Plan to a fresh read-only
-`plan-verifier`. `REVISE` returns ownership to the main session; only `READY`
-allows `exit_plan_mode` to open the native approval surface. The same readiness
-gate applies when the user entered Plan Mode with `/plan`. Automatic permission
-grants are tool authorization, not approval of the implementation Plan.
+Native Plan Mode remains mandatory for large, ambiguous, architectural, risky,
+or explicitly plan-first work. Independent review is triggered separately by
+concrete security, irreversible or external, data, release, or cross-component
+acceptance risk. When triggered, the full `plan.md` goes to a fresh read-only
+`plan-verifier`; lower-risk Plans proceed directly to the same native approval
+surface. Automatic permission grants are tool authorization, not approval.
+
+When the native Plan gate and trigger both apply, pre-approval
+`plan-verifier` readiness is mandatory. Post-implementation `verifier` review
+after primary acceptance is mandatory whenever the trigger applies; unrelated
+role delegation remains optional.
 
 Large Plans use one program envelope plus independently approvable execution
-slices. Review the envelope, then only the next executable slice. `READY` is
-bare; structured `REVISE` identifies each blocker and its closure check. Two
-automatic revisions for one unit are the limit before user direction. This
-pauses that unit without treating it as ready or blocking unrelated ready
-slices; shared constraints and prerequisites still gate dependent work.
+slices. Every future slice keeps a stable ID, outcome, and prerequisites; later
+implementation detail is optional until it becomes current. Review the envelope,
+then only the next executable slice. `READY` is bare; structured `REVISE`
+reports all known P0-P2 blockers in one pass. After two automatic revisions,
+the main session stops the loop and dispositions each blocker as `FIX`, `DEFER`,
+or `REJECT`; a material candidate, scope, or evidence change permits one
+bounded final readiness pass, not an automatic-loop reset. User input is
+reserved for an unresolved final blocker, product or authority choice, or an
+original scope that can no longer be met.
 
 For non-security-sensitive work, a single unknown bug should not become a
 sequential `scout` → `executor` pipeline when diagnosis, patch design, and live
@@ -136,14 +143,16 @@ and bounded P2 adjudication, never new VCS, publish, install, credential,
 destructive, external, scope, or spend authority. `ASK` uses a native question
 tool only when the current session exposes one; otherwise the turn ends
 `PAUSED_NEEDS_USER`, and headless execution exits without polling or guessing.
-P0 freezes the affected dependency chain. Every verification run shares five
-materially changed P1/P2 fix/reverify passes (1-2 normal, 3-5 recovery) before
-`PAUSED_VERIFICATION`. Verification identity includes the complete tested
+P0 freezes the affected dependency chain. Normal recovery is one targeted
+recheck of the original failure plus a bounded regression. Five materially
+changed P1/P2 passes remain an emergency ceiling for high-risk, claim-critical
+recovery, not a quota. Verification identity includes the complete tested
 candidate, claim, acceptance, contract, external evidence or prerequisites, and
 environment; a prior verifier's own output is not a change. The candidate
 fingerprint covers committed head, tracked and staged diff, untracked input
 paths plus content, and dirty submodule content. Artifact digests complement
-source identity unless the artifact is the sole deliverable. P2 waits for the
+source identity unless the artifact is the sole deliverable. Recovery stops
+earlier when another pass would only search adjacent risk. P2 waits for the
 next coherent boundary, P3/P4 get no dedicated loop, and `INCONCLUSIVE` gets one
 retry after a material change.
 
