@@ -60,7 +60,9 @@ class TemplateContractTests(unittest.TestCase):
 
     def test_review_and_execution_boundaries_stay_separate(self) -> None:
         plan = (AGENTS_DIR / "plan-verifier.md").read_text(encoding="utf-8")
+        normalized_plan = " ".join(plan.split())
         outcome = (AGENTS_DIR / "verifier.md").read_text(encoding="utf-8")
+        normalized_outcome = " ".join(outcome.split())
         security_review = (AGENTS_DIR / "security-reviewer.md").read_text(
             encoding="utf-8"
         )
@@ -68,17 +70,22 @@ class TemplateContractTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("READY", plan)
-        self.assertIn("REVISE", plan)
-        self.assertIn("shared outcome, scope, non-goals", plan)
-        self.assertIn("explicit outcome, scope and non-goals", plan)
-        self.assertIn("acceptance that proves the slice outcome", plan)
-        self.assertNotIn("CONFIRMED", plan)
-        self.assertNotIn("REFUTED", plan)
+        self.assertIn("READY", normalized_plan)
+        self.assertIn("REVISE", normalized_plan)
+        self.assertIn("shared outcome, scope, non-goals", normalized_plan)
+        self.assertIn("explicit outcome, scope and non-goals", normalized_plan)
+        self.assertIn("acceptance that proves the slice outcome", normalized_plan)
+        self.assertIn("every currently known blocker in the same pass", normalized_plan)
+        self.assertIn("Do not use `REVISE` for P3/P4 advice", normalized_plan)
+        self.assertIn("P2 = material bounded or recoverable", normalized_plan)
+        self.assertNotIn("CONFIRMED", normalized_plan)
+        self.assertNotIn("REFUTED", normalized_plan)
 
         self.assertIn("CONFIRMED", outcome)
         self.assertIn("REFUTED", outcome)
         self.assertIn("INCONCLUSIVE", outcome)
+        self.assertIn("Drive the primary acceptance flow first", normalized_outcome)
+        self.assertIn("do not reopen adjacent hardening", normalized_outcome)
         self.assertNotIn("READY", outcome)
         self.assertNotIn("REVISE", outcome)
 
@@ -96,7 +103,7 @@ class TemplateContractTests(unittest.TestCase):
             r"REFUTED.*at least one reproducible P0-P2 finding",
         )
         self.assertIn(
-            "Regressions caused by the reviewed implementation are claim-relevant",
+            "regressions caused by the reviewed implementation are claim-relevant",
             normalized,
         )
         self.assertIn("For every finding or advisory under any verdict", normalized)
@@ -199,7 +206,8 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("Never swap `plan-verifier` and `verifier`", policy)
         self.assertIn("first tool call MUST be", policy)
         self.assertIn(
-            "Only `READY` verdicts for every required readiness unit", policy
+            "When review is required, `READY` for the envelope and current slice",
+            " ".join(policy.split()),
         )
         self.assertNotIn("run_in_background", policy)
         self.assertNotIn("Bash(", policy)
@@ -234,7 +242,7 @@ class TemplateContractTests(unittest.TestCase):
             self.assertIn(f"`{role}`", readme)
 
         self.assertIn("enter_plan_mode", readme)
-        self.assertIn("Mandatory fresh read-only `plan-verifier`", readme)
+        self.assertIn("Risk-triggered fresh read-only `plan-verifier`", readme)
         self.assertIn("INCONCLUSIVE", readme)
 
     def test_design_explains_grok_adaptation_boundary(self) -> None:
@@ -243,7 +251,7 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("Explore", design)
         self.assertIn("policy names roles but never embeds", design)
         self.assertIn("plan mode", design.lower())
-        self.assertIn("Plan readiness is the deliberate exception", design)
+        self.assertIn("Native Plan Mode remains mandatory", design)
 
 
 if __name__ == "__main__":

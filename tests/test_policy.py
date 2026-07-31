@@ -74,22 +74,22 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("native Grok Plan Mode", gate_text)
         self.assertIn("first tool call MUST be `enter_plan_mode`", gate_text)
         self.assertIn("before repository discovery or implementation", gate_text)
-        self.assertIn("including user-initiated `/plan` sessions", gate_text)
+        self.assertIn("covers user-initiated `/plan` sessions", gate_text)
         self.assertIn(
             "spawn a fresh `plan-verifier` with `background: false`", gate_text
         )
         self.assertIn("exact target readiness-unit ID and kind", gate_text)
         self.assertIn("`## Target readiness unit` block", gate_text)
         self.assertIn(
-            "Only `READY` verdicts for every required readiness unit", gate_text
+            "When review is required, `READY` for the envelope and current slice",
+            gate_text,
         )
-        self.assertIn("the envelope and current slice for large work", gate_text)
         self.assertIn("On `REVISE`", gate_text)
         self.assertIn("Automatic permission grants", gate_text)
         self.assertIn("always-approve or `bypassPermissions`", gate_text)
         self.assertIn("implementation tool calls remain prohibited", gate_text)
         self.assertIn(
-            "explicitly approves the verified Plan in a later interaction", gate_text
+            "explicitly approves the presented Plan in a later interaction", gate_text
         )
         self.assertIn("skip planning, skip approval, start immediately", gate_text)
         self.assertRegex(
@@ -131,17 +131,25 @@ class PolicyTests(unittest.TestCase):
 
     def test_native_plan_lifecycle_requires_readiness_before_exit(self) -> None:
         policy = POLICY.read_text(encoding="utf-8")
-        lifecycle = policy[policy.index("| Discovery |") : policy.index("### Dispatch")]
+        lifecycle = " ".join(
+            policy[policy.index("| Discovery |") : policy.index("### Dispatch")].split()
+        )
+        normalized_policy = " ".join(policy.split())
 
         self.assertIn("Enter native Plan Mode first", lifecycle)
-        self.assertIn("Mandatory fresh read-only `plan-verifier`", lifecycle)
         self.assertIn(
-            "`READY` for the envelope and current slice unlocks `exit_plan_mode`",
+            "When the independent-review trigger applies, fresh read-only "
+            "`plan-verifier`",
             lifecycle,
         )
         self.assertIn(
-            "mandatory `plan-verifier` readiness gate is not an optional delegation",
-            policy,
+            "plus `READY` for every risk-triggered readiness unit",
+            lifecycle,
+        )
+        self.assertIn(
+            "When the independent-review trigger applies, the `plan-verifier` "
+            "readiness gate is not an optional delegation",
+            normalized_policy,
         )
         for phrase in (
             "program envelope",
@@ -154,7 +162,9 @@ class PolicyTests(unittest.TestCase):
             "Minimum revision:",
             "Acceptance check:",
             "two automatic `REVISE` verdicts for the same unit",
-            "pause it and ask the user",
+            "disposition every blocker as `FIX`, `DEFER`, or `REJECT`",
+            "Ask the user only for unresolved P0/P1",
+            "not merely to authorize another review round",
             "findings and dispositions into the Plan",
             "every initial review or fresh re-review of a security-affected unit",
             "do not rely on the Plan text alone for that handoff",
@@ -162,13 +172,16 @@ class PolicyTests(unittest.TestCase):
             "Include every exact affected unit ID in its brief",
             "If an affected ID changes or is added, repeat security review",
         ):
-            self.assertIn(phrase, policy)
+            self.assertIn(phrase, normalized_policy)
 
     def test_calibrated_adjudication_and_bounded_long_run_policy(self) -> None:
         policy = " ".join(POLICY.read_text(encoding="utf-8").split())
 
         self.assertIn("`CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`", policy)
         for phrase in (
+            "Role verdicts are evidence, not implementation or scope authority",
+            "label it `FIX`, `DEFER`, or `REJECT`",
+            "evidence-backed rejection is an addressed finding",
             "P0/P1 label requires reproducible evidence",
             "introduced P2 regression remains blocking",
             "fix other P2 findings only when bounded",
@@ -195,11 +208,13 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertRegex(
             policy,
-            r"recovery budget and severity rules below apply to every verification run.*"
+            r"five-pass budget below is an emergency ceiling for high-risk recovery, "
+            r"not a quota.*"
             r"P0 freezes its slice and dependents.*"
-            r"Blocking P1/P2 recovery shares at most five materially changed "
-            r"fix/reverify passes.*"
-            r"passes 1-2 are normal and 3-5 are recovery.*"
+            r"Default recovery is one targeted recheck.*"
+            r"High-risk, claim-critical P1/P2 recovery may use at most five "
+            r"materially changed fix/reverify passes.*"
+            r"passes 3-5 are emergency recovery.*"
             r"external evidence or prerequisites.*immediately preceding verifier's "
             r"verdict or output alone is not new evidence.*"
             r"tracked and staged diff.*untracked input paths plus content.*"
@@ -212,6 +227,9 @@ class PolicyTests(unittest.TestCase):
         )
         self.assertIn("introduced P2 regression remains blocking", policy)
         self.assertIn("headless likely-long run without an explicit mode", policy)
+        self.assertIn("not a new adjacent-hardening audit", policy)
+        self.assertIn("next pass would only search adjacent risk", policy)
+        self.assertIn("batch-disposition every current-head finding", policy)
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):
