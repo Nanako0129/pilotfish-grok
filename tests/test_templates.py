@@ -77,6 +77,8 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("acceptance that proves the slice outcome", normalized_plan)
         self.assertIn("every currently known blocker in the same pass", normalized_plan)
         self.assertIn("Do not use `REVISE` for P3/P4 advice", normalized_plan)
+        self.assertIn("optional downstream implementation detail", normalized_plan)
+        self.assertIn("Missing required future-slice metadata", normalized_plan)
         self.assertIn("P2 = material bounded or recoverable", normalized_plan)
         self.assertNotIn("CONFIRMED", normalized_plan)
         self.assertNotIn("REFUTED", normalized_plan)
@@ -244,6 +246,12 @@ class TemplateContractTests(unittest.TestCase):
         self.assertIn("enter_plan_mode", readme)
         self.assertIn("Risk-triggered fresh read-only `plan-verifier`", readme)
         self.assertIn("INCONCLUSIVE", readme)
+
+        readme_zh = (ROOT / "README.zh-TW.md").read_text(encoding="utf-8")
+        self.assertIn("具體風險結果要求 fresh `verifier`", readme_zh)
+        self.assertIn("若處置", readme_zh)
+        self.assertIn("一般\n復原只做一次", readme_zh)
+        self.assertNotIn("非平凡結果要求 fresh `verifier`", readme_zh)
 
     def test_design_explains_grok_adaptation_boundary(self) -> None:
         design = (ROOT / "docs" / "design.md").read_text(encoding="utf-8")

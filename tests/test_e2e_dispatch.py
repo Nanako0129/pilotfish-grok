@@ -434,7 +434,7 @@ class E2EDispatchTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "each affected readiness"):
             runner.assert_security_review_before_readiness({"events": events})
 
-    def test_native_plan_gate_stops_after_two_revisions_per_unit(self) -> None:
+    def test_native_plan_gate_allows_one_material_final_readiness_pass(self) -> None:
         runner = load_runner_module()
         events = [{"kind": "tool_call", "sequence": 0, "tool": "enter_plan_mode"}]
         prompt = (
@@ -444,6 +444,12 @@ class E2EDispatchTests(unittest.TestCase):
         )
         for index, verdict in enumerate(("REVISE", "REVISE", "READY"), start=1):
             subagent_id = f"pv-{index}"
+            review_prompt = prompt
+            if index == 3:
+                review_prompt += (
+                    "\n## Final readiness recheck\n"
+                    "- Material change: Added the missing migration acceptance evidence.\n"
+                )
             events.extend(
                 [
                     {
@@ -452,7 +458,7 @@ class E2EDispatchTests(unittest.TestCase):
                         "subagent_type": "plan-verifier",
                         "capability_mode": "read-only",
                         "subagent_id": subagent_id,
-                        "raw_input": {"background": False, "prompt": prompt},
+                        "raw_input": {"background": False, "prompt": review_prompt},
                     },
                     {
                         "kind": "finished",
@@ -471,7 +477,64 @@ class E2EDispatchTests(unittest.TestCase):
                 '{"state":"Active","awaiting_plan_approval":true}\n',
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(AssertionError, "two-REVISE cap"):
+            gate = runner.assert_native_plan_gate(
+                {"events": events, "session_dir": str(session)}
+            )
+            self.assertEqual(gate["verdicts"], ["REVISE", "REVISE", "READY"])
+            self.assertEqual(
+                gate["final_readiness_material_changes"],
+                ["Added the missing migration acceptance evidence."],
+            )
+
+            events[5]["raw_input"]["prompt"] = prompt
+            with self.assertRaisesRegex(AssertionError, "material-change evidence"):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
+            events[5]["raw_input"]["prompt"] = review_prompt
+            exit_event = events.pop()
+            events.extend(
+                [
+                    {
+                        "kind": "spawned",
+                        "sequence": 7,
+                        "subagent_type": "plan-verifier",
+                        "capability_mode": "read-only",
+                        "subagent_id": "pv-4",
+                        "raw_input": {
+                            "background": False,
+                            "prompt": review_prompt,
+                        },
+                    },
+                    {
+                        "kind": "finished",
+                        "sequence": 8,
+                        "subagent_id": "pv-4",
+                        "output": "READY",
+                    },
+                    {**exit_event, "sequence": 9},
+                ]
+            )
+            with self.assertRaisesRegex(
+                AssertionError, "bounded final readiness pass"
+            ):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
+            fourth_finish = events.pop(-2)
+            with self.assertRaisesRegex(
+                AssertionError, "bounded final readiness pass"
+            ):
+                runner.assert_native_plan_gate(
+                    {"events": events, "session_dir": str(session)}
+                )
+
+            events.append({**fourth_finish, "sequence": 10})
+            with self.assertRaisesRegex(
+                AssertionError, "bounded final readiness pass"
+            ):
                 runner.assert_native_plan_gate(
                     {"events": events, "session_dir": str(session)}
                 )

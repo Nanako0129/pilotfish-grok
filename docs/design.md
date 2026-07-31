@@ -117,12 +117,19 @@ acceptance risk. When triggered, the full `plan.md` goes to a fresh read-only
 `plan-verifier`; lower-risk Plans proceed directly to the same native approval
 surface. Automatic permission grants are tool authorization, not approval.
 
+When the trigger applies, pre-approval `plan-verifier` readiness and
+post-implementation `verifier` review after primary acceptance are mandatory;
+unrelated role delegation remains optional.
+
 Large Plans use one program envelope plus independently approvable execution
-slices. Review the envelope, then only the next executable slice. `READY` is
-bare; structured `REVISE` reports all known P0-P2 blockers in one pass. After
-two automatic revisions, the main session stops resubmitting, dispositions each
-blocker as `FIX`, `DEFER`, or `REJECT`, and continues independent slices. User
-input is reserved for unresolved P0/P1, product or authority choices, or an
+slices. Every future slice keeps a stable ID, outcome, and prerequisites; later
+implementation detail is optional until it becomes current. Review the envelope,
+then only the next executable slice. `READY` is bare; structured `REVISE`
+reports all known P0-P2 blockers in one pass. After two automatic revisions,
+the main session stops the loop and dispositions each blocker as `FIX`, `DEFER`,
+or `REJECT`; a material candidate, scope, or evidence change permits one
+bounded final readiness pass, not an automatic-loop reset. User input is
+reserved for an unresolved final blocker, product or authority choice, or an
 original scope that can no longer be met.
 
 For non-security-sensitive work, a single unknown bug should not become a

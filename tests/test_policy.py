@@ -147,8 +147,8 @@ class PolicyTests(unittest.TestCase):
             lifecycle,
         )
         self.assertIn(
-            "When the independent-review trigger applies, the `plan-verifier` "
-            "readiness gate is not an optional delegation",
+            "When the independent-review trigger applies, these review gates "
+            "are not an optional delegation",
             normalized_policy,
         )
         for phrase in (
@@ -165,6 +165,11 @@ class PolicyTests(unittest.TestCase):
             "disposition every blocker as `FIX`, `DEFER`, or `REJECT`",
             "Ask the user only for unresolved P0/P1",
             "not merely to authorize another review round",
+            "one bounded final readiness pass",
+            "this is not an automatic-loop reset",
+            "## Final readiness recheck",
+            "- Material change:",
+            "If that pass still returns `REVISE`, stop",
             "findings and dispositions into the Plan",
             "every initial review or fresh re-review of a security-affected unit",
             "do not rely on the Plan text alone for that handoff",
@@ -230,6 +235,14 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("not a new adjacent-hardening audit", policy)
         self.assertIn("next pass would only search adjacent risk", policy)
         self.assertIn("batch-disposition every current-head finding", policy)
+        self.assertIn(
+            "post-implementation `verifier` outcome review after primary acceptance are mandatory",
+            policy,
+        )
+        self.assertIn(
+            "not a prerequisite for the pre-approval `plan-verifier`",
+            policy,
+        )
 
     def test_agent_names_match_filenames_and_remain_leaf_roles(self) -> None:
         for path in AGENTS_DIR.glob("*.md"):

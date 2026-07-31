@@ -1,5 +1,5 @@
 <!-- pilotfish-grok:begin -->
-<!-- pilotfish-grok v1.0.6 -->
+<!-- pilotfish-grok v1.0.7 -->
 ## Orchestration
 
 ### Non-negotiable native Plan gate
@@ -19,9 +19,10 @@ when the user requests it or the claim crosses a security or trust boundary,
 destructive, irreversible, or external mutation, a data, schema,
 serialization, migration, or release boundary, or a material cross-component
 interaction in acceptance. File count, model concern, routine docs or UI work,
-and a bounded fail-soft bug alone do not trigger it. Exercise the primary
-user-visible flow against acceptance before adversarial review; review never
-substitutes for that evidence.
+and a bounded fail-soft bug alone do not trigger it. After implementation and
+approval, a triggered `verifier` must exercise the primary user-visible flow
+against acceptance before adversarial outcome review; this post-implementation
+evidence is not a prerequisite for the pre-approval `plan-verifier`.
 
 Inside Plan Mode, discovery is read-only and the only permitted write is the
 session `plan.md`. The main session must synthesize the complete Plan. When the
@@ -51,15 +52,20 @@ stable IDs, outcomes, and prerequisites until they become current.
 
 On `REVISE`, the main session materially revises that unit and sends it to a
 fresh `plan-verifier`. After two automatic `REVISE` verdicts for the same unit,
-stop resubmitting and independently disposition every blocker as `FIX`,
+stop the automatic loop and independently disposition every blocker as `FIX`,
 `DEFER`, or `REJECT`; simplify, narrow, or split the unit and continue
-independently approvable slices. Ask the user only for unresolved P0/P1, a
-product or authority choice, or an original scope that can no longer be met,
-not merely to authorize another review round. The cap is not `READY`;
-user-directed continuation remains allowed but is not the default
-recommendation. When review is required, `READY` for the envelope and current
-slice permits `exit_plan_mode`; otherwise the completed Plan may proceed to
-that native approval surface without claiming a verifier verdict.
+independently approvable slices. If a disposition materially changes the
+candidate, scope, or supporting evidence, allow one bounded final readiness
+pass for that same unit to confirm closure; this is not an automatic-loop reset.
+That closing brief must contain a `## Final readiness recheck` block with a
+non-empty `- Material change:` entry naming the candidate, scope, or evidence
+delta.
+If that pass still returns `REVISE`, stop. Ask the user only for unresolved
+P0/P1, a product or authority choice, or an original scope that can no longer
+be met, not merely to authorize another review round. The cap is not `READY`.
+When review is required, `READY` for the envelope and current slice permits
+`exit_plan_mode`; otherwise the completed Plan may proceed to that native
+approval surface without claiming a verifier verdict.
 
 Source writes and implementation tool calls remain prohibited until the user
 explicitly approves the presented Plan in a later interaction. A broad initial
@@ -140,10 +146,13 @@ even when the user does not mention agents:
 
 The direct-work and single-unknown-bug exceptions here still apply. The dispatch
 brake may serialize a matching unit but must not silently convert it to
-main-session work. Other delegation remains optional.
+main-session work. Other delegation remains optional. When the independent-review
+trigger applies, pre-approval `plan-verifier` readiness and post-implementation
+`verifier` outcome review after primary acceptance are mandatory; the dispatch
+brake and coordination-cost heuristic cannot waive either gate.
 
-When the independent-review trigger applies, the `plan-verifier` readiness gate
-is not an optional delegation choice and is not waived by the dispatch brake or
+When the independent-review trigger applies, these review gates are not an
+optional delegation choice and are not waived by the dispatch brake or
 coordination-cost heuristic.
 
 A delegation-planning layer may shape discovery questions, execution topology,

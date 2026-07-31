@@ -38,7 +38,7 @@ coding session 的 token 多半花在搜尋、機械編輯、測試與文件，�
 - 保護主 session context（偵察與 bulk 工作在 child session）
 - 依角色分層 **reasoning effort**
 - 對命名角色強制 **capability mode**（`read-only` / `execute` / `all`）
-- 非平凡結果要求 fresh `verifier`
+- 具體風險結果要求 fresh `verifier`
 
 之後若目錄出現較便宜模型，只需在 `[subagents.models]` 釘選，不必改政策文字。
 
@@ -108,28 +108,36 @@ flowchart TD
 - 命名角色用 `spawn_subagent`；可並行時 `background: true`
 - 寫入 agent 要獨佔 ownership 或 `isolation: "worktree"`
 - 對命名角色不要在 spawn 時覆寫 `model` / `capability_mode`
-- 委派結果是證據，不是結論；非平凡變更走 fresh `verifier`
+- 委派結果是證據，不是結論；安全、不可逆／外部、資料、release 或跨元件
+  acceptance 風險觸發 fresh `verifier`，且該閘門不可省略；其他委派仍可選
 - 長時間 process 由主 session 擁有；leaf 回傳 exact command + cwd/worktree + env
 
 ## 生命週期
 
 大型、模糊、架構、高風險或明確 plan-first 的工作，必須先進入 Grok
-原生 Plan Mode 才能 discovery。大型 Plan 把共享限制放在 program
-envelope，只拆獨立 execution slice。Envelope 與下一個可執行 slice
-通過 fresh read-only review 後，即可用 `exit_plan_mode` 交付批准。
-`REVISE` 必須列 blocker、evidence、最小修訂與 acceptance check；同一
-unit 自動修訂兩次後停止重試，改由使用者決定。
+原生 Plan Mode 才能 discovery。獨立 review 另外由具體安全、不可逆／外部、
+資料、release 或跨元件 acceptance 風險觸發；低風險 Plan 仍須走原生批准面，
+但不宣稱 verifier `READY`。大型 Plan 把共享限制放在 program envelope，只拆
+獨立 execution slice；需要 review 時先審 envelope，再審下一個可執行 slice。
+`REVISE` 必須列 blocker、evidence、最小修訂與 acceptance check；同一 unit
+自動修訂兩次後停止自動迴圈，逐項標記 `FIX`、`DEFER` 或 `REJECT`。若處置
+使 candidate、範圍或支持證據實質改變，可對同一 unit 做一次有界的最終 readiness
+pass；這不會重設自動迴圈。最終 pass 仍未 `READY` 時，才向使用者詢問未解的
+P0/P1、產品／權限決定，或已無法達成的原始範圍。
 
 ```mermaid
 flowchart LR
     R[複雜需求] --> N[enter_plan_mode]
     N --> D[唯讀 discovery]
     D --> P[Session plan.md]
-    P --> PV[Fresh plan-verifier]
+    P --> T{Review trigger?}
+    T -->|是| PV[Fresh plan-verifier]
+    T -->|否| A
     PV -->|REVISE| P
     PV -->|READY| A[exit_plan_mode 與批准]
     A --> E[Execution]
-    E --> V[Verification]
+    E --> F[Primary acceptance flow]
+    F --> V[Triggered verifier]
     V -->|REFUTED| E
     V -->|CONFIRMED| Done[完成]
     V -->|INCONCLUSIVE| Pause[暫停或一次實質變更後重試]
@@ -138,17 +146,20 @@ flowchart LR
 | 階段 | 閘門 | 可委派 |
 |---|---|---|
 | **Discovery** | Native Plan Mode 已啟用；問題、範圍、證據格式、停止條件穩定 | 有界唯讀 `scout` |
-| **Plan** | Program envelope 加上獨立 slices | 強制 fresh read-only `plan-verifier` 先審 envelope，再審下一個可執行 slice |
-| **Approval** | `READY` 才能 `exit_plan_mode`；使用者批准已驗證 Plan | 僅唯讀；尚不送 implementation brief |
+| **Plan** | Program envelope 加上獨立 slices | 有具體風險時，fresh read-only `plan-verifier` 先審 envelope，再審下一個可執行 slice |
+| **Approval** | 完整 Plan；有具體風險時，各 readiness unit `READY` 才能 `exit_plan_mode`；使用者批准呈現的 Plan | 僅唯讀；尚不送 implementation brief |
 | **Execution** | 穩定 contract、獨佔 ownership、done criteria | `mech-executor` / `executor` / `security-executor` |
-| **Verification** | 可測試的精確宣稱與 acceptance | fresh `verifier` → `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
+| **Verification** | 實作批准後先跑 primary acceptance flow；有具體風險時才做 fresh outcome review | 觸發時強制 fresh `verifier` → `CONFIRMED` / `REFUTED` / `INCONCLUSIVE` |
 
 對非資安敏感工作，單一未知 bug 的診斷、第一次修復與現場驗證若共用同一條證據鏈，留在主 session——不要拆成 `scout` → `executor` 管線。
 
 只有可重現且阻擋精確宣稱的 P0-P2 finding 才能產生 `REFUTED`；P3/P4
-僅為 advisory，證據不足則為 `INCONCLUSIVE`。長時間工作會宣告
-orchestration `AUTO` 或 `ASK`：`AUTO` 不新增任何權限，若沒有原生提問
-工具，`ASK` 會暫停，而阻擋性的 P1/P2 共用五次實質變更 pass。完整判定與
+僅為 advisory，證據不足則為 `INCONCLUSIVE`。Outcome verifier 必須先證明
+primary acceptance flow，再檢查最小的 claim-relevant 邊界；pre-approval
+plan-verifier 不代替這項實作後證據。長時間工作會宣告 orchestration `AUTO`
+或 `ASK`：`AUTO` 不新增任何權限，若沒有原生提問工具，`ASK` 會暫停。一般
+復原只做一次針對原始失敗的 recheck 加有界 regression；高風險、claim-critical
+的 P1/P2 最多五次實質變更 pass，後三次只屬緊急上限，不是配額。完整判定與
 復原 contract 請見[設計文件](docs/design.md#phase-aware-orchestration)。
 
 ## 安裝
@@ -158,7 +169,7 @@ orchestration `AUTO` 或 `ASK`：`AUTO` 不新增任何權限，若沒有原生�
 建議釘選 release 後再 clone：
 
 ```sh
-git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.7 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -282,7 +293,7 @@ python3 benchmarks/e2e-dispatch/run.py
 
 ## 限制（v1.0）
 
-- Live e2e 證明 ambient native Plan entry、強制 Plan readiness review、adversarial approval-bypass gate 與**強制**角色 capability；不代表 mandatory Plan lifecycle 之外的 ambient 角色選擇一定正確
+- 已記錄的 v1.0.5 live e2e 證明 historical bytes 的 ambient native Plan entry、舊 mandatory Plan-readiness lifecycle、adversarial approval-bypass gate 與**強制**角色 capability。v1.0.7 risk-triggered boundary 目前只有 static 與 install-only evidence；live run 在 inference 前因 Grok Build 額度耗盡而中止
 - 父 session plan mode **不**擋子代理寫入——唯讀靠 role capability
 - 單一模型目錄沒有多模型價差套利；effort 與 context 節省仍成立
 - 不卸載、不改寫 Claude pilotfish

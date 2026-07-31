@@ -128,7 +128,9 @@ flowchart TD
 - Do not override `model` or `capability_mode` on named roles at spawn time.
 - Treat delegated results as evidence. Concrete security, irreversible/external,
   data, release, or cross-component acceptance risk triggers fresh review;
-  “non-trivial” alone does not.
+  “non-trivial” alone does not. When triggered, pre-approval `plan-verifier`
+  readiness and post-implementation `verifier` review after primary acceptance
+  are mandatory; unrelated delegation remains optional.
 - Long-running processes stay main-session owned: leaves return exact command + cwd/worktree + env for handoff.
 
 ## Lifecycle
@@ -139,9 +141,13 @@ constraints in a program envelope and split only independent execution slices.
 Risk-triggered envelope and current-slice reviews happen before
 `exit_plan_mode`; lower-risk Plans still use the native approval surface.
 `REVISE` returns all known P0-P2 blockers in one pass. After two automatic
-revisions, Grok stops resubmitting, dispositions each blocker as `FIX`,
-`DEFER`, or `REJECT`, and asks only for unresolved high-impact or product and
-authority decisions.
+revisions, Grok stops the automatic loop and dispositions each blocker as
+`FIX`, `DEFER`, or `REJECT`. A material candidate, scope, or evidence change
+permits one bounded final readiness pass, not an automatic-loop reset; then ask
+only for unresolved high-impact or product and authority decisions. After
+implementation and approval, a triggered outcome review first exercises the
+primary acceptance flow; pre-approval readiness does not substitute for that
+evidence.
 
 ```mermaid
 flowchart LR
@@ -154,7 +160,8 @@ flowchart LR
     PV -->|REVISE| P
     PV -->|READY| A[exit_plan_mode and approval]
     A --> E[Execution]
-    E --> V[Verification]
+    E --> F[Primary acceptance flow]
+    F --> V[Triggered verifier]
     V -->|REFUTED| E
     V -->|CONFIRMED| Done[Done]
     V -->|INCONCLUSIVE| Pause[Pause or one material retry]
@@ -185,7 +192,7 @@ targeted recheck; five P1/P2 passes remain only a high-risk emergency ceiling.
 From a local clone (recommended):
 
 ```sh
-git clone --branch v1.0.6 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
+git clone --branch v1.0.7 --depth 1 https://github.com/Nanako0129/pilotfish-grok.git
 cd pilotfish-grok
 grok
 ```
@@ -324,10 +331,11 @@ The instruction-surface comparison and approval-gate ablations are documented in
 
 ## Limitations (v1.0)
 
-- Live e2e proves ambient native Plan entry, mandatory Plan readiness review,
-  the adversarial approval-bypass gate, and **forced** role capability
-  application. It does not prove general unprompted role choice outside the
-  mandatory Plan lifecycle.
+- The recorded v1.0.5 live e2e proves ambient native Plan entry, the earlier
+  mandatory Plan-readiness lifecycle, the adversarial approval-bypass gate,
+  and **forced** role capability application for those historical bytes. The
+  v1.0.7 risk-triggered boundary has static and install-only evidence; its live
+  run was blocked before inference by exhausted Grok Build balance.
 - Parent plan mode does **not** block write-capable subagents—read-only roles rely on role capability defaults.
 - Single-model catalogs do not get multi-model price arbitrage; effort and context savings still apply.
 - Does not uninstall or rewrite Claude pilotfish.
