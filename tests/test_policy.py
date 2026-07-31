@@ -138,7 +138,7 @@ class PolicyTests(unittest.TestCase):
 
         self.assertIn("Enter native Plan Mode first", lifecycle)
         self.assertIn(
-            "When the independent-review trigger applies, fresh read-only "
+            "When the native Plan gate and independent-review trigger both apply, fresh read-only "
             "`plan-verifier`",
             lifecycle,
         )
@@ -147,8 +147,8 @@ class PolicyTests(unittest.TestCase):
             lifecycle,
         )
         self.assertIn(
-            "When the independent-review trigger applies, these review gates "
-            "are not an optional delegation",
+            "When the native Plan gate and independent-review trigger both apply, "
+            "pre-approval `plan-verifier` readiness is mandatory",
             normalized_policy,
         )
         for phrase in (
@@ -169,6 +169,8 @@ class PolicyTests(unittest.TestCase):
             "this is not an automatic-loop reset",
             "## Final readiness recheck",
             "- Material change:",
+            "## Blocker dispositions",
+            "maps every prior `Blocker:`",
             "If that pass still returns `REVISE`, stop",
             "findings and dispositions into the Plan",
             "every initial review or fresh re-review of a security-affected unit",
@@ -236,7 +238,7 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("next pass would only search adjacent risk", policy)
         self.assertIn("batch-disposition every current-head finding", policy)
         self.assertIn(
-            "post-implementation `verifier` outcome review after primary acceptance are mandatory",
+            "post-implementation `verifier` outcome review after primary acceptance is mandatory",
             policy,
         )
         self.assertIn(

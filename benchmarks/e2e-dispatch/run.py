@@ -610,6 +610,30 @@ def final_readiness_material_change(prompt: str) -> str | None:
     return change.group(1).strip() if change else None
 
 
+def revise_blockers(output: str) -> list[str]:
+    return [
+        match.group(1).strip()
+        for match in re.finditer(
+            r"(?im)^\s*\*{0,2}Blocker:\*{0,2}\s*(\S.*)$", output
+        )
+    ]
+
+
+def final_readiness_dispositions(prompt: str) -> list[dict[str, str]]:
+    section = re.search(
+        r"(?ims)^## Blocker dispositions\s*(.*?)(?=^## |\Z)", prompt
+    )
+    if not section:
+        return []
+    return [
+        {"status": match.group(1).upper(), "blocker": match.group(2).strip()}
+        for match in re.finditer(
+            r"(?im)^\s*-\s*(FIX|DEFER|REJECT):\s*(\S.*)$",
+            section.group(1),
+        )
+    ]
+
+
 def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
     plan_spawns = {
         event.get("subagent_id"): event
@@ -644,6 +668,8 @@ def plan_verdict_events(result: dict[str, Any]) -> list[dict[str, Any]]:
                 "target_id": target["id"] if target else None,
                 "target_kind": target["kind"] if target else None,
                 "material_change": final_readiness_material_change(prompt),
+                "blockers": revise_blockers(output),
+                "dispositions": final_readiness_dispositions(prompt),
             }
         )
     return verdicts
@@ -756,7 +782,7 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
     ):
         raise AssertionError(f"plan-verifier was not foreground: {plan_spawns!r}")
 
-    pre_exit_spawn_counts: dict[tuple[str, str], int] = {}
+    pre_exit_spawns: list[tuple[dict[str, Any], tuple[str, str]]] = []
     for spawn in plan_spawns:
         if spawn["sequence"] >= exit_event["sequence"]:
             continue
@@ -766,14 +792,7 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
                 f"native Plan had a missing readiness target: {spawn!r}"
             )
         target_key = (target["id"], target["kind"])
-        pre_exit_spawn_counts[target_key] = (
-            pre_exit_spawn_counts.get(target_key, 0) + 1
-        )
-        if pre_exit_spawn_counts[target_key] > 3:
-            raise AssertionError(
-                "readiness unit exceeded the bounded final readiness pass: "
-                f"{target_key!r}"
-            )
+        pre_exit_spawns.append((spawn, target_key))
 
     verdicts = plan_verdict_events(result)
     pre_exit_verdicts = [
@@ -790,24 +809,59 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
             f"{pre_exit_verdicts!r}"
         )
 
+    revisions_by_target: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for event in pre_exit_verdicts:
+        if event["verdict"] == "REVISE":
+            target = (event["target_id"], event["target_kind"])
+            revisions_by_target.setdefault(target, []).append(event)
+    for target, revisions in revisions_by_target.items():
+        if len(revisions) < 2:
+            continue
+        second_revision_finish = revisions[1]["finish_sequence"]
+        final_spawns = [
+            spawn
+            for spawn, spawn_target in pre_exit_spawns
+            if spawn_target == target and spawn["sequence"] > second_revision_finish
+        ]
+        if len(final_spawns) > 1:
+            raise AssertionError(
+                f"readiness unit exceeded the bounded final readiness pass: {target!r}"
+            )
+
     envelope_ready = False
     slice_review_started = False
     slice_target: str | None = None
     revision_counts: dict[tuple[str, str], int] = {}
-    review_counts: dict[tuple[str, str], int] = {}
     for index, event in enumerate(pre_exit_verdicts):
         target = (event["target_id"], event["target_kind"])
         prior_revisions = revision_counts.get(target, 0)
-        review_counts[target] = review_counts.get(target, 0) + 1
         if prior_revisions >= 2:
-            if review_counts[target] > 3:
-                raise AssertionError(
-                    f"readiness unit exceeded the bounded final readiness pass: {target!r}"
-                )
             if not event.get("material_change"):
                 raise AssertionError(
                     "final readiness pass requires material-change evidence: "
                     f"{target!r}"
+                )
+            prior_blockers = list(dict.fromkeys(
+                blocker
+                for prior in pre_exit_verdicts[:index]
+                if prior["target_id"] == event["target_id"]
+                and prior["target_kind"] == event["target_kind"]
+                and prior["verdict"] == "REVISE"
+                for blocker in prior.get("blockers", [])
+            ))
+            disposition_blockers = {
+                item["blocker"].casefold()
+                for item in event.get("dispositions", [])
+            }
+            missing_blockers = [
+                blocker
+                for blocker in prior_blockers
+                if blocker.casefold() not in disposition_blockers
+            ]
+            if not prior_blockers or missing_blockers:
+                raise AssertionError(
+                    "final readiness pass requires dispositions for every prior "
+                    f"blocker: missing={missing_blockers or prior_blockers!r}"
                 )
             if any(
                 later["target_id"] == event["target_id"]
@@ -920,6 +974,11 @@ def assert_native_plan_gate(result: dict[str, Any]) -> dict[str, Any]:
             event["material_change"]
             for event in pre_exit_verdicts
             if event.get("material_change")
+        ],
+        "final_readiness_dispositions": [
+            disposition
+            for event in pre_exit_verdicts
+            for disposition in event.get("dispositions", [])
         ],
         "fresh_reverification_after_revise": bool(revisions),
         "ready_before_exit": True,

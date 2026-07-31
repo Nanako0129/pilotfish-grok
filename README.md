@@ -128,9 +128,9 @@ flowchart TD
 - Do not override `model` or `capability_mode` on named roles at spawn time.
 - Treat delegated results as evidence. Concrete security, irreversible/external,
   data, release, or cross-component acceptance risk triggers fresh review;
-  “non-trivial” alone does not. When triggered, pre-approval `plan-verifier`
-  readiness and post-implementation `verifier` review after primary acceptance
-  are mandatory; unrelated delegation remains optional.
+  “non-trivial” alone does not. When native Plan Mode and the trigger both
+  apply, pre-approval `plan-verifier` readiness is mandatory; post-implementation
+  `verifier` review after primary acceptance is mandatory whenever triggered.
 - Long-running processes stay main-session owned: leaves return exact command + cwd/worktree + env for handoff.
 
 ## Lifecycle
@@ -154,14 +154,16 @@ flowchart LR
     R[Complex request] --> N[enter_plan_mode]
     N --> D[Read-only discovery]
     D --> P[Session plan.md]
-    P --> R{Review trigger?}
-    R -->|yes| PV[Fresh plan-verifier]
-    R -->|no| A
+    P --> T{Review trigger?}
+    T -->|yes| PV[Fresh plan-verifier]
+    T -->|no| A
     PV -->|REVISE| P
     PV -->|READY| A[exit_plan_mode and approval]
     A --> E[Execution]
     E --> F[Primary acceptance flow]
-    F --> V[Triggered verifier]
+    F --> O{Outcome review triggered?}
+    O -->|yes| V[Fresh verifier]
+    O -->|no| Done
     V -->|REFUTED| E
     V -->|CONFIRMED| Done[Done]
     V -->|INCONCLUSIVE| Pause[Pause or one material retry]

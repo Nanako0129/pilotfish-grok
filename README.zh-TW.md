@@ -108,8 +108,9 @@ flowchart TD
 - 命名角色用 `spawn_subagent`；可並行時 `background: true`
 - 寫入 agent 要獨佔 ownership 或 `isolation: "worktree"`
 - 對命名角色不要在 spawn 時覆寫 `model` / `capability_mode`
-- 委派結果是證據，不是結論；安全、不可逆／外部、資料、release 或跨元件
-  acceptance 風險觸發 fresh `verifier`，且該閘門不可省略；其他委派仍可選
+- 委派結果是證據，不是結論；native Plan Mode 與風險 trigger 同時適用時，
+  pre-approval `plan-verifier` 不可省略；風險 trigger 適用時，
+  post-implementation fresh `verifier` 不可省略；其他委派仍可選
 - 長時間 process 由主 session 擁有；leaf 回傳 exact command + cwd/worktree + env
 
 ## 生命週期
@@ -137,7 +138,9 @@ flowchart LR
     PV -->|READY| A[exit_plan_mode 與批准]
     A --> E[Execution]
     E --> F[Primary acceptance flow]
-    F --> V[Triggered verifier]
+    F --> O{需要 outcome review?}
+    O -->|是| V[Fresh verifier]
+    O -->|否| Done
     V -->|REFUTED| E
     V -->|CONFIRMED| Done[完成]
     V -->|INCONCLUSIVE| Pause[暫停或一次實質變更後重試]

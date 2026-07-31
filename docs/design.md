@@ -117,9 +117,10 @@ acceptance risk. When triggered, the full `plan.md` goes to a fresh read-only
 `plan-verifier`; lower-risk Plans proceed directly to the same native approval
 surface. Automatic permission grants are tool authorization, not approval.
 
-When the trigger applies, pre-approval `plan-verifier` readiness and
-post-implementation `verifier` review after primary acceptance are mandatory;
-unrelated role delegation remains optional.
+When the native Plan gate and trigger both apply, pre-approval
+`plan-verifier` readiness is mandatory. Post-implementation `verifier` review
+after primary acceptance is mandatory whenever the trigger applies; unrelated
+role delegation remains optional.
 
 Large Plans use one program envelope plus independently approvable execution
 slices. Every future slice keeps a stable ID, outcome, and prerequisites; later

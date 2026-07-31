@@ -6,7 +6,7 @@
 
 For every large, ambiguous, architectural, risky, or explicitly plan-first
 task, native Grok Plan Mode is mandatory. A fresh `plan-verifier` readiness
-pass is additionally required when the independent-review trigger below
+pass is additionally required for those tasks when the independent-review trigger below
 applies. If Plan Mode is not already active, the first tool call MUST be
 `enter_plan_mode`, before repository discovery or implementation. If
 `enter_plan_mode` is denied or unavailable, stop without source writes or
@@ -59,7 +59,8 @@ candidate, scope, or supporting evidence, allow one bounded final readiness
 pass for that same unit to confirm closure; this is not an automatic-loop reset.
 That closing brief must contain a `## Final readiness recheck` block with a
 non-empty `- Material change:` entry naming the candidate, scope, or evidence
-delta.
+delta, plus a `## Blocker dispositions` block that maps every prior `Blocker:`
+to `FIX`, `DEFER`, or `REJECT`.
 If that pass still returns `REVISE`, stop. Ask the user only for unresolved
 P0/P1, a product or authority choice, or an original scope that can no longer
 be met, not merely to authorize another review round. The cap is not `READY`.
@@ -118,7 +119,7 @@ this lifecycle:
 | Phase | Gate | Eligible delegation |
 |---|---|---|
 | Discovery | Enter native Plan Mode first for gated work, then stabilize the question, allowed scope, evidence format, and stop condition with read-only discovery. The final implementation may remain unknown. | Bounded read-only `scout` work on disjoint evidence surfaces. |
-| Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, a program envelope, and independent slices. | When the independent-review trigger applies, fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
+| Plan | The main session writes one `plan.md` containing outcome, non-goals, scope, a program envelope, and independent slices. | When the native Plan gate and independent-review trigger both apply, fresh read-only `plan-verifier` reviews the envelope, then the next executable slice; structured `REVISE` returns ownership to the main session. |
 | Approval | A complete Plan, plus `READY` for every risk-triggered readiness unit, unlocks `exit_plan_mode` to present that scope and wait for explicit user approval. | Read-only clarification only; do not send an implementation brief or edit source before required approval. Parent Plan Mode does **not** replace read-only capability on child agents. |
 | Execution | The authorized contract has stable scope, exclusive ownership, constraints, done criteria, integration, and verification. | `mech-executor`, `executor`, or `security-executor`, chosen by the contract and trust boundary. |
 | Verification | The integrated result has an exact claim and acceptance concrete enough to test. | When the independent-review trigger applies, a fresh `verifier` returns only `CONFIRMED`, `REFUTED`, or `INCONCLUSIVE`. |
@@ -146,14 +147,12 @@ even when the user does not mention agents:
 
 The direct-work and single-unknown-bug exceptions here still apply. The dispatch
 brake may serialize a matching unit but must not silently convert it to
-main-session work. Other delegation remains optional. When the independent-review
-trigger applies, pre-approval `plan-verifier` readiness and post-implementation
-`verifier` outcome review after primary acceptance are mandatory; the dispatch
-brake and coordination-cost heuristic cannot waive either gate.
-
-When the independent-review trigger applies, these review gates are not an
-optional delegation choice and are not waived by the dispatch brake or
-coordination-cost heuristic.
+main-session work. Other delegation remains optional. When the native Plan gate
+and independent-review trigger both apply, pre-approval `plan-verifier`
+readiness is mandatory. Whenever the independent-review trigger applies,
+post-implementation `verifier` outcome review after primary acceptance is
+mandatory. The dispatch brake and coordination-cost heuristic cannot waive an
+applicable gate.
 
 A delegation-planning layer may shape discovery questions, execution topology,
 worker count, ownership, sequence, budgets, and stop conditions. This policy
