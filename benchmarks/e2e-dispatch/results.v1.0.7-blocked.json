@@ -1,0 +1,22 @@
+{
+  "schema": "pilotfish-grok.e2e-dispatch.blocked.v1",
+  "started_at": "2026-07-31T03:10:10.424049+00:00",
+  "finished_at": "2026-07-31T03:10:15.923487+00:00",
+  "run_id": "8fec1c58-eeef-4564-b644-10deecf05535",
+  "candidate_version": "1.0.7",
+  "grok_version": "0.2.114",
+  "mode": "live",
+  "install_preflight": {
+    "ok": true,
+    "roles_present": 7,
+    "policy_version": "1.0.7",
+    "active_claude_entries": 0
+  },
+  "first_case": "ambient-native-plan",
+  "status": "blocked_before_inference",
+  "error": {
+    "http_status": 402,
+    "message": "Grok Build usage balance exhausted"
+  },
+  "live_claim": "unrun"
+}

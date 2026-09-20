@@ -2,6 +2,25 @@
 
 All notable changes to pilotfish-grok are documented in this file.
 
+## [1.0.7] — 2026-07-31
+
+Make independent review risk-triggered while keeping the triggered
+post-implementation `verifier` mandatory after primary acceptance. Pre-approval
+`plan-verifier` review now evaluates plan readiness without requiring an
+unimplemented user flow.
+
+After two automatic `REVISE` verdicts, allow one bounded final readiness pass
+when a disposition materially changes the candidate, scope, or supporting
+evidence. Keep stable IDs, outcomes, and prerequisites required for future
+slices while leaving later implementation detail optional, and synchronize the
+Traditional Chinese lifecycle documentation.
+
+The 1.0.7 install-only Gate passed on Grok Build 0.2.114 with all seven roles,
+the matching policy stamp, and zero active Claude compatibility entries. The
+full live Gate was attempted but stopped before inference with HTTP 402 because
+the Grok Build usage balance was exhausted; no 1.0.7 live behavior claim is
+made.
+
 ## [1.0.6] — 2026-07-29
 
 Calibrate outcome verification with `CONFIRMED`, `REFUTED`, and
